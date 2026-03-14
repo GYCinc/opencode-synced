@@ -185,10 +185,34 @@ export function applyOverridesToRuntimeConfig(
   overrides: Record<string, unknown>
 ): void {
   const merged = deepMerge(config, overrides) as Record<string, unknown>;
+  const resolved = resolveEnvPlaceholders(merged);
   for (const key of Object.keys(config)) {
     delete config[key];
   }
-  Object.assign(config, merged);
+  Object.assign(config, resolved);
+}
+
+export function resolveEnvPlaceholders(config: unknown): unknown {
+  if (typeof config === 'string') {
+    return config.replace(/\{env:([^}]+)\}/g, (match, envVar) => {
+      const value = process.env[envVar];
+      return value !== undefined ? value : match;
+    });
+  }
+
+  if (Array.isArray(config)) {
+    return config.map((item) => resolveEnvPlaceholders(item));
+  }
+
+  if (isPlainObject(config)) {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(config)) {
+      result[key] = resolveEnvPlaceholders(value);
+    }
+    return result;
+  }
+
+  return config;
 }
 
 export function deepMerge<T>(base: T, override: unknown): T {
