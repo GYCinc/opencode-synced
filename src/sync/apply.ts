@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
@@ -39,12 +40,19 @@ interface ExtraPathManifest {
   entries: ExtraPathManifestEntry[];
 }
 
+export let CHUNK_SIZE = 50 * 1024 * 1024; // 50MB
+export const CHUNK_SUFFIX = '.ocsync-chunk.';
+
+export function setChunkSizeForTesting(size: number) {
+  CHUNK_SIZE = size;
+}
+
 export async function syncRepoToLocal(
   plan: SyncPlan,
   overrides: Record<string, unknown> | null
 ): Promise<void> {
   for (const item of plan.items) {
-    await copyItem(item.repoPath, item.localPath, item.type);
+    await copyItem(item.repoPath, item.localPath, item.type, false, false);
   }
 
   await applyExtraPaths(plan, plan.extraConfigs);
@@ -98,7 +106,7 @@ export async function syncLocalToRepo(
       continue;
     }
 
-    await copyItem(item.localPath, item.repoPath, item.type, true);
+    await copyItem(item.localPath, item.repoPath, item.type, true, true);
   }
 
   await writeExtraPathManifest(plan, plan.extraConfigs);
@@ -109,22 +117,51 @@ async function copyItem(
   sourcePath: string,
   destinationPath: string,
   type: SyncItem['type'],
-  removeWhenMissing = false
+  removeWhenMissing = false,
+  toRepo = false
 ): Promise<void> {
-  if (!(await pathExists(sourcePath))) {
+  const sourceExists = await pathExists(sourcePath);
+  const sourceChunks = type === 'file' ? await findChunks(sourcePath) : [];
+
+  if (!sourceExists && sourceChunks.length === 0) {
     if (removeWhenMissing) {
       await removePath(destinationPath);
+      if (toRepo) {
+        await removeChunks(destinationPath);
+      }
     }
     return;
   }
 
   if (type === 'file') {
+    if (toRepo) {
+      const stat = await fs.stat(sourcePath);
+      if (stat.size > CHUNK_SIZE) {
+        await removePath(destinationPath);
+        await removeChunks(destinationPath);
+        await fs.mkdir(path.dirname(destinationPath), { recursive: true });
+        await splitIntoChunks(sourcePath, destinationPath);
+        return;
+      }
+      await removeChunks(destinationPath);
+    } else {
+      if (sourceChunks.length > 0) {
+        await reassembleChunks(path.dirname(sourcePath), sourceChunks, destinationPath);
+        const firstChunkStat = await fs.stat(path.join(path.dirname(sourcePath), sourceChunks[0]));
+        await chmodIfExists(destinationPath, firstChunkStat.mode & 0o777);
+        return;
+      }
+    }
+
     await copyFileWithMode(sourcePath, destinationPath);
     return;
   }
 
   await removePath(destinationPath);
-  await copyDirRecursive(sourcePath, destinationPath);
+  if (toRepo) {
+    await removeChunks(destinationPath);
+  }
+  await copyDirRecursive(sourcePath, destinationPath, toRepo);
 }
 
 async function copyConfigForRepo(
@@ -198,21 +235,59 @@ async function copyFileWithMode(sourcePath: string, destinationPath: string): Pr
   await chmodIfExists(destinationPath, stat.mode & 0o777);
 }
 
-async function copyDirRecursive(sourcePath: string, destinationPath: string): Promise<void> {
+async function copyDirRecursive(
+  sourcePath: string,
+  destinationPath: string,
+  toRepo = false
+): Promise<void> {
   const stat = await fs.stat(sourcePath);
   await fs.mkdir(destinationPath, { recursive: true });
   const entries = await fs.readdir(sourcePath, { withFileTypes: true });
 
+  const processedFiles = new Set<string>();
+
+  if (!toRepo) {
+    const chunksByBaseFile = new Map<string, string[]>();
+    for (const entry of entries) {
+      if (entry.isFile() && entry.name.includes(CHUNK_SUFFIX)) {
+        const baseName = entry.name.split(CHUNK_SUFFIX)[0];
+        if (baseName) {
+          const chunks = chunksByBaseFile.get(baseName) ?? [];
+          chunks.push(entry.name);
+          chunksByBaseFile.set(baseName, chunks);
+        }
+      }
+    }
+
+    for (const [baseName, chunks] of chunksByBaseFile.entries()) {
+      const destFile = path.join(destinationPath, baseName);
+      await reassembleChunks(sourcePath, chunks, destFile);
+      const firstChunkStat = await fs.stat(path.join(sourcePath, chunks[0]));
+      await chmodIfExists(destFile, firstChunkStat.mode & 0o777);
+      for (const chunk of chunks) processedFiles.add(chunk);
+    }
+  }
+
   for (const entry of entries) {
+    if (processedFiles.has(entry.name)) continue;
+
     const entrySource = path.join(sourcePath, entry.name);
     const entryDest = path.join(destinationPath, entry.name);
 
     if (entry.isDirectory()) {
-      await copyDirRecursive(entrySource, entryDest);
+      await copyDirRecursive(entrySource, entryDest, toRepo);
       continue;
     }
 
     if (entry.isFile()) {
+      if (toRepo) {
+        const fileStat = await fs.stat(entrySource);
+        if (fileStat.size > CHUNK_SIZE) {
+          await splitIntoChunks(entrySource, entryDest);
+          continue;
+        }
+        await removeChunks(entryDest);
+      }
       await copyFileWithMode(entrySource, entryDest);
     }
   }
@@ -244,9 +319,12 @@ async function applyExtraPaths(plan: SyncPlan, extra: ExtraPathPlan): Promise<vo
     const localPath = entry.sourcePath;
     const entryType: ExtraPathType = entry.type ?? 'file';
 
-    if (!(await pathExists(repoPath))) continue;
+    const repoExists = await pathExists(repoPath);
+    const repoChunks = entryType === 'file' ? await findChunks(repoPath) : [];
 
-    await copyItem(repoPath, localPath, entryType);
+    if (!repoExists && repoChunks.length === 0) continue;
+
+    await copyItem(repoPath, localPath, entryType, false, false);
     await applyExtraPathModes(localPath, entry);
   }
 }
@@ -271,7 +349,7 @@ async function writeExtraPathManifest(plan: SyncPlan, extra: ExtraPathPlan): Pro
     }
     const stat = await fs.stat(sourcePath);
     if (stat.isDirectory()) {
-      await copyDirRecursive(sourcePath, entry.repoPath);
+      await copyItem(sourcePath, entry.repoPath, 'dir', true, true);
       const items = await collectExtraPathItems(sourcePath, sourcePath);
       entries.push({
         sourcePath,
@@ -283,7 +361,7 @@ async function writeExtraPathManifest(plan: SyncPlan, extra: ExtraPathPlan): Pro
       continue;
     }
     if (stat.isFile()) {
-      await copyFileWithMode(sourcePath, entry.repoPath);
+      await copyItem(sourcePath, entry.repoPath, 'file', true, true);
       entries.push({
         sourcePath,
         repoPath: path.relative(plan.repoRoot, entry.repoPath),
@@ -372,6 +450,87 @@ function resolveExtraPathItem(basePath: string, relativePath: string): string | 
   }
 
   return resolvedPath;
+}
+
+export async function splitIntoChunks(sourcePath: string, destinationBase: string): Promise<void> {
+  const stat = await fs.stat(sourcePath);
+  const fd = await fs.open(sourcePath, 'r');
+  try {
+    let chunkIndex = 0;
+    let bytesRead = 0;
+    const buffer = Buffer.alloc(Math.min(CHUNK_SIZE, 1024 * 1024));
+
+    while (bytesRead < stat.size) {
+      const chunkPath = `${destinationBase}${CHUNK_SUFFIX}${chunkIndex}`;
+      const chunkFd = await fs.open(chunkPath, 'w');
+      try {
+        let currentChunkBytes = 0;
+        while (currentChunkBytes < CHUNK_SIZE && bytesRead < stat.size) {
+          const toRead = Math.min(
+            buffer.length,
+            CHUNK_SIZE - currentChunkBytes,
+            stat.size - bytesRead
+          );
+          const { bytesRead: n } = await fd.read(buffer, 0, toRead, bytesRead);
+          await chunkFd.write(buffer, 0, n);
+          bytesRead += n;
+          currentChunkBytes += n;
+        }
+      } finally {
+        await chunkFd.close();
+      }
+      chunkIndex++;
+    }
+  } finally {
+    await fd.close();
+  }
+}
+
+export async function reassembleChunks(
+  sourceDir: string,
+  chunkNames: string[],
+  destinationPath: string
+): Promise<void> {
+  await fs.mkdir(path.dirname(destinationPath), { recursive: true });
+  const destFd = await fs.open(destinationPath, 'w');
+  try {
+    const sortedChunks = [...chunkNames].sort((a, b) => {
+      const partsA = a.split(CHUNK_SUFFIX);
+      const partsB = b.split(CHUNK_SUFFIX);
+      const idxA = Number.parseInt(partsA[partsA.length - 1] ?? '0', 10);
+      const idxB = Number.parseInt(partsB[partsB.length - 1] ?? '0', 10);
+      return idxA - idxB;
+    });
+
+    for (const chunkName of sortedChunks) {
+      const chunkPath = path.join(sourceDir, chunkName);
+      const chunkContent = await fs.readFile(chunkPath);
+      await destFd.write(chunkContent);
+    }
+  } finally {
+    await destFd.close();
+  }
+}
+
+async function removeChunks(basePath: string): Promise<void> {
+  const dir = path.dirname(basePath);
+  const baseName = path.basename(basePath);
+  if (!(await pathExists(dir))) return;
+
+  const entries = await fs.readdir(dir);
+  for (const entry of entries) {
+    if (entry.startsWith(baseName + CHUNK_SUFFIX)) {
+      await fs.rm(path.join(dir, entry), { force: true });
+    }
+  }
+}
+
+async function findChunks(basePath: string): Promise<string[]> {
+  const dir = path.dirname(basePath);
+  const baseName = path.basename(basePath);
+  if (!(await pathExists(dir))) return [];
+  const entries = await fs.readdir(dir);
+  return entries.filter((e) => e.startsWith(baseName + CHUNK_SUFFIX));
 }
 
 function isDeepEqual(left: unknown, right: unknown): boolean {
