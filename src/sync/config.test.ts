@@ -79,6 +79,11 @@ describe('normalizeSyncConfig', () => {
     expect(normalized.includeModelFavorites).toBe(true);
   });
 
+  it('enables skills by default', () => {
+    const normalized = normalizeSyncConfig({});
+    expect(normalized.includeSkills).toBe(true);
+  });
+
   it('defaults extra path lists when omitted', () => {
     const normalized = normalizeSyncConfig({ includeSecrets: true });
     expect(normalized.extraSecretPaths).toEqual([]);

@@ -161,4 +161,33 @@ describe('buildSyncPlan', () => {
 
     expect(disabledItem).toBeUndefined();
   });
+
+  it('includes skills directory by default and allows disabling', () => {
+    const env = { HOME: '/home/test' } as NodeJS.ProcessEnv;
+    const locations = resolveSyncLocations(env, 'linux');
+    const config: SyncConfig = {
+      repo: { owner: 'acme', name: 'config' },
+      includeSecrets: false,
+    };
+
+    const plan = buildSyncPlan(normalizeSyncConfig(config), locations, '/repo', 'linux');
+    const skillsItem = plan.items.find((item) =>
+      item.localPath.endsWith('/.config/opencode/skills')
+    );
+
+    expect(skillsItem).toBeTruthy();
+    expect(skillsItem?.type).toBe('dir');
+
+    const disabledPlan = buildSyncPlan(
+      normalizeSyncConfig({ ...config, includeSkills: false }),
+      locations,
+      '/repo',
+      'linux'
+    );
+    const disabledItem = disabledPlan.items.find((item) =>
+      item.localPath.endsWith('/.config/opencode/skills')
+    );
+
+    expect(disabledItem).toBeUndefined();
+  });
 });

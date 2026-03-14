@@ -52,6 +52,7 @@ const DEFAULT_OVERRIDES_NAME = 'opencode-synced.overrides.jsonc';
 const DEFAULT_STATE_NAME = 'sync-state.json';
 
 const CONFIG_DIRS = ['agent', 'command', 'mode', 'tool', 'themes', 'plugin'];
+const SKILLS_DIR = 'skills';
 const SESSION_DIRS = ['storage/session', 'storage/message', 'storage/part', 'storage/session_diff'];
 const PROMPT_STASH_FILES = ['prompt-stash.jsonl', 'prompt-history.jsonl'];
 const MODEL_FAVORITES_FILE = 'model.json';
@@ -219,6 +220,16 @@ export function buildSyncPlan(
       localPath: path.join(stateRoot, MODEL_FAVORITES_FILE),
       repoPath: path.join(repoStateRoot, MODEL_FAVORITES_FILE),
       type: 'file',
+      isSecret: false,
+      isConfigFile: false,
+    });
+  }
+
+  if (config.includeSkills !== false) {
+    items.push({
+      localPath: path.join(configRoot, SKILLS_DIR),
+      repoPath: path.join(repoConfigRoot, SKILLS_DIR),
+      type: 'dir',
       isSecret: false,
       isConfigFile: false,
     });
