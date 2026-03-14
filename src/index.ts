@@ -152,10 +152,7 @@ export const opencodeConfigSync: Plugin = async (ctx) => {
         .boolean()
         .optional()
         .describe('Sync model favorites (state/model.json)'),
-      includeSkills: tool.schema
-        .boolean()
-        .optional()
-        .describe('Sync skills directory'),
+      includeSkills: tool.schema.boolean().optional().describe('Sync skills directory'),
       create: tool.schema.boolean().optional().describe('Create repo if missing'),
       private: tool.schema.boolean().optional().describe('Create repo as private'),
       extraSecretPaths: tool.schema.array(tool.schema.string()).optional(),
