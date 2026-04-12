@@ -30,6 +30,7 @@ import {
   getRepoStatus,
   hasLocalChanges,
   isRepoCloned,
+  parseRepoReference,
   pushBranch,
   repoExists,
   resolveRepoBranch,
@@ -109,6 +110,9 @@ export function createSyncService(ctx: SyncServiceContext): SyncService {
   const locations = resolveSyncLocations();
   const log = createLogger(ctx.client);
   const lockPath = path.join(path.dirname(locations.statePath), 'sync.lock');
+  const strictLinkRepo = resolveStrictLinkRepo(process.env.OPENCODE_SYNC_E2E_STRICT_LINK_REPO);
+  const disableAutoRepoDiscovery =
+    process.env.OPENCODE_SYNC_E2E_DISABLE_AUTO_REPO_DISCOVERY === '1' || strictLinkRepo !== null;
   let tursoSyncTimer: ReturnType<typeof setInterval> | null = null;
   let tursoSyncIntervalSec = 15;
 
@@ -606,23 +610,49 @@ export function createSyncService(ctx: SyncServiceContext): SyncService {
       }),
     link: (options: LinkOptions) =>
       runExclusive(async () => {
-        const found = await findSyncRepo(ctx.$, options.repo);
+        if (disableAutoRepoDiscovery && !options.repo) {
+          const expectation = strictLinkRepo
+            ? ` Provide the exact repo: ${strictLinkRepo.owner}/${strictLinkRepo.name}.`
+            : '';
+          throw new SyncCommandError(
+            'Repo auto-discovery is disabled in this environment. ' +
+              'Run /sync-link with an explicit repo argument.' +
+              expectation
+          );
+        }
+
+        const found = await findSyncRepo(ctx.$, options.repo, {
+          disableAutoDiscovery: disableAutoRepoDiscovery,
+        });
 
         if (!found) {
           const searchedFor = options.repo
             ? `"${options.repo}"`
-            : 'common sync repo names (my-opencode-config, opencode-config, etc.)';
+            : disableAutoRepoDiscovery
+              ? '(none; auto-discovery disabled)'
+              : 'common sync repo names (my-opencode-config, opencode-config, etc.)';
 
           const lines = [
             `Could not find an existing sync repo. Searched for: ${searchedFor}`,
             '',
             'To link to an existing repo, run:',
-            '  /sync-link <repo-name>',
+            '  /sync-link <owner/repo>',
             '',
             'To create a new sync repo, run:',
             '  /sync-init',
           ];
           return lines.join('\n');
+        }
+
+        if (strictLinkRepo) {
+          const linkedIdentifier = `${found.owner}/${found.name}`.toLowerCase();
+          const expectedIdentifier = `${strictLinkRepo.owner}/${strictLinkRepo.name}`.toLowerCase();
+          if (linkedIdentifier !== expectedIdentifier) {
+            throw new SyncCommandError(
+              `Strict link mode expected repo ${strictLinkRepo.owner}/${strictLinkRepo.name}, ` +
+                `but resolved ${found.owner}/${found.name}.`
+            );
+          }
         }
 
         const config = normalizeSyncConfig({
@@ -1389,4 +1419,19 @@ function parseResolutionDecision(text: string): ResolutionDecision {
   } catch {
     return { action: 'manual', reason: 'Failed to parse AI decision' };
   }
+}
+
+function resolveStrictLinkRepo(raw: string | undefined): { owner: string; name: string } | null {
+  if (!raw) return null;
+  const value = raw.trim();
+  if (!value) return null;
+
+  const parsed = parseRepoReference(value, '__opencode_sync_no_owner__');
+  if (!parsed || parsed.owner === '__opencode_sync_no_owner__') {
+    throw new SyncCommandError(
+      'OPENCODE_SYNC_E2E_STRICT_LINK_REPO must be an explicit owner/repo or GitHub repo URL.'
+    );
+  }
+
+  return parsed;
 }
