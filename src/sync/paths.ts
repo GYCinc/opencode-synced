@@ -27,6 +27,7 @@ export interface SyncItem {
   type: SyncItemType;
   isSecret: boolean;
   isConfigFile: boolean;
+  preserveWhenMissing?: boolean;
 }
 
 export interface ExtraPathPlan {
@@ -53,6 +54,7 @@ const DEFAULT_STATE_NAME = 'sync-state.json';
 
 const CONFIG_DIRS = ['agent', 'command', 'mode', 'tool', 'themes', 'plugin'];
 const SESSION_DIRS = ['storage/session', 'storage/message', 'storage/part', 'storage/session_diff'];
+const SESSION_DB_FILE = 'opencode.db';
 const PROMPT_STASH_FILES = ['prompt-stash.jsonl', 'prompt-history.jsonl'];
 const MODEL_FAVORITES_FILE = 'model.json';
 
@@ -245,6 +247,15 @@ export function buildSyncPlan(
     }
 
     if (config.includeSessions) {
+      items.push({
+        localPath: path.join(dataRoot, SESSION_DB_FILE),
+        repoPath: path.join(repoDataRoot, SESSION_DB_FILE),
+        type: 'file',
+        isSecret: true,
+        isConfigFile: false,
+        preserveWhenMissing: true,
+      });
+
       for (const dirName of SESSION_DIRS) {
         items.push({
           localPath: path.join(dataRoot, dirName),
@@ -252,6 +263,7 @@ export function buildSyncPlan(
           type: 'dir',
           isSecret: true,
           isConfigFile: false,
+          preserveWhenMissing: true,
         });
       }
     }

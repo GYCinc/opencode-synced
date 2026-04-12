@@ -117,10 +117,17 @@ Sync your opencode sessions (conversation history from `/sessions`) across machi
 
 Synced session data:
 
-- `~/.local/share/opencode/storage/session/` - Session files
-- `~/.local/share/opencode/storage/message/` - Message history
-- `~/.local/share/opencode/storage/part/` - Message parts
+- `~/.local/share/opencode/opencode.db` - Primary SQLite session database (current opencode versions)
+- `~/.local/share/opencode/opencode.db-wal` and `~/.local/share/opencode/opencode.db-shm` - SQLite sidecars synced with `opencode.db` when present (for WAL consistency)
+- `~/.local/share/opencode/storage/session/` - Legacy session files (pre-SQLite migration compatibility)
+- `~/.local/share/opencode/storage/message/` - Legacy message history (pre-SQLite migration compatibility)
+- `~/.local/share/opencode/storage/part/` - Legacy message parts (pre-SQLite migration compatibility)
 - `~/.local/share/opencode/storage/session_diff/` - Session diffs
+
+opencode handles JSON-to-SQLite migration automatically when `opencode.db` is missing, so syncing both
+formats supports users who have not migrated yet and users already on SQLite.
+
+After pulling session changes, restart opencode to ensure the latest session state is loaded.
 
 ### Prompt Stash (private repos only)
 
