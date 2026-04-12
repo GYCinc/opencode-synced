@@ -3,6 +3,7 @@ import { normalizeSyncConfig } from './config.js';
 import type { SyncLocations } from './paths.js';
 import {
   extractHeadlessLoginHints,
+  extractRows,
   isRetryableTursoError,
   resolveSessionDbPaths,
   resolveTursoCredentialPath,
@@ -90,5 +91,33 @@ describe('path helpers', () => {
       walPath: '/home/test/.local/share/opencode/opencode.db-wal',
       shmPath: '/home/test/.local/share/opencode/opencode.db-shm',
     });
+  });
+});
+
+describe('extractRows', () => {
+  it('extracts rows from top-level execute result shape', () => {
+    const rows = [[{ type: 'text', value: 'hello' }]];
+    expect(extractRows({ rows })).toEqual(rows);
+    expect(extractRows({ result: { rows } })).toEqual(rows);
+  });
+
+  it('extracts rows from Turso v2 pipeline execute envelope', () => {
+    const rows = [[{ type: 'text', value: 'hello' }]];
+    expect(
+      extractRows({
+        type: 'ok',
+        response: {
+          type: 'execute',
+          result: {
+            rows,
+          },
+        },
+      })
+    ).toEqual(rows);
+  });
+
+  it('returns empty list when result has no rows', () => {
+    expect(extractRows({ type: 'ok' })).toEqual([]);
+    expect(extractRows(null)).toEqual([]);
   });
 });
