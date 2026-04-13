@@ -236,10 +236,10 @@ export function createTursoSessionBackend(options: {
   const writeKnownSha = async (
     credential: TursoSessionCredential,
     nextSha: string | null
-  ): Promise<TursoSessionCredential> => {
-    if (!nextSha) return credential;
+  ): Promise<void> => {
+    if (!nextSha) return;
     if (credential.syncState?.lastKnownSnapshotSha === nextSha) {
-      return credential;
+      return;
     }
 
     const updated: TursoSessionCredential = {
@@ -252,7 +252,6 @@ export function createTursoSessionBackend(options: {
       updatedAt: new Date().toISOString(),
     };
     await writeCredential(credentialPath, updated);
-    return updated;
   };
 
   const applyPull = async (
@@ -265,32 +264,26 @@ export function createTursoSessionBackend(options: {
       machineId: string;
       updatedAt: string;
     }
-  ): Promise<{ result: TursoSessionSyncResult; credential: TursoSessionCredential }> => {
+  ): Promise<TursoSessionSyncResult> => {
     await writeLocalSessionSnapshot(paths, remoteSnapshot);
-    const updatedCredential = await writeKnownSha(credential, remoteSnapshot.sha256);
+    await writeKnownSha(credential, remoteSnapshot.sha256);
     return {
-      result: {
-        status: 'synced',
-        sha256: remoteSnapshot.sha256,
-        message: `Pulled sessions from Turso snapshot (${remoteSnapshot.machineId}).`,
-      },
-      credential: updatedCredential,
+      status: 'synced',
+      sha256: remoteSnapshot.sha256,
+      message: `Pulled sessions from Turso snapshot (${remoteSnapshot.machineId}).`,
     };
   };
 
   const applyPush = async (
     credential: TursoSessionCredential,
     localSnapshot: SessionSnapshot
-  ): Promise<{ result: TursoSessionSyncResult; credential: TursoSessionCredential }> => {
+  ): Promise<TursoSessionSyncResult> => {
     await upsertRemoteSnapshot(credential, localSnapshot, resolveMachineId());
-    const updatedCredential = await writeKnownSha(credential, localSnapshot.sha256);
+    await writeKnownSha(credential, localSnapshot.sha256);
     return {
-      result: {
-        status: 'synced',
-        sha256: localSnapshot.sha256,
-        message: 'Pushed local sessions to Turso.',
-      },
-      credential: updatedCredential,
+      status: 'synced',
+      sha256: localSnapshot.sha256,
+      message: 'Pushed local sessions to Turso.',
     };
   };
 
@@ -298,7 +291,10 @@ export function createTursoSessionBackend(options: {
     const credential = await requireCredential();
     await ensureSnapshotTable(credential);
 
-    const remoteSnapshot = await fetchRemoteSnapshot(credential);
+    const [remoteSnapshot, localSnapshot] = await Promise.all([
+      fetchRemoteSnapshot(credential),
+      readLocalSessionSnapshot(paths),
+    ]);
     if (!remoteSnapshot) {
       return {
         status: 'skipped',
@@ -306,7 +302,6 @@ export function createTursoSessionBackend(options: {
       };
     }
 
-    const localSnapshot = await readLocalSessionSnapshot(paths);
     if (localSnapshot && localSnapshot.sha256 === remoteSnapshot.sha256) {
       return {
         status: 'unchanged',
@@ -315,8 +310,7 @@ export function createTursoSessionBackend(options: {
       };
     }
 
-    const applied = await applyPull(credential, remoteSnapshot);
-    return applied.result;
+    return await applyPull(credential, remoteSnapshot);
   };
 
   const push = async (): Promise<TursoSessionSyncResult> => {
@@ -340,8 +334,7 @@ export function createTursoSessionBackend(options: {
       };
     }
 
-    const applied = await applyPush(credential, localSnapshot);
-    return applied.result;
+    return await applyPush(credential, localSnapshot);
   };
 
   const status = async (): Promise<string> => {
@@ -363,11 +356,13 @@ export function createTursoSessionBackend(options: {
   ): Promise<TursoSessionSyncCycleResult> => {
     const preference = options.preference ?? 'auto';
     const allowLocalPull = options.allowLocalPull ?? true;
-    let credential = await requireCredential();
+    const credential = await requireCredential();
     await ensureSnapshotTable(credential);
 
-    const remoteSnapshot = await fetchRemoteSnapshot(credential);
-    const localSnapshot = await readLocalSessionSnapshot(paths);
+    const [remoteSnapshot, localSnapshot] = await Promise.all([
+      fetchRemoteSnapshot(credential),
+      readLocalSessionSnapshot(paths),
+    ]);
     const knownSha = credential.syncState?.lastKnownSnapshotSha?.trim() || null;
     const pullBefore: TursoSessionSyncResult = {
       status: 'skipped',
@@ -392,7 +387,7 @@ export function createTursoSessionBackend(options: {
     }
 
     if (localSnapshot && remoteSnapshot && localSnapshot.sha256 === remoteSnapshot.sha256) {
-      credential = await writeKnownSha(credential, localSnapshot.sha256);
+      await writeKnownSha(credential, localSnapshot.sha256);
       pullBefore.status = 'unchanged';
       pullBefore.sha256 = localSnapshot.sha256;
       pullBefore.message = 'Local and remote session snapshots already match.';
@@ -432,22 +427,22 @@ export function createTursoSessionBackend(options: {
         }
 
         const pulled = await applyPull(credential, remoteSnapshot);
-        pullBefore.status = pulled.result.status;
-        pullBefore.sha256 = pulled.result.sha256;
-        pullBefore.message = pulled.result.message;
+        pullBefore.status = pulled.status;
+        pullBefore.sha256 = pulled.sha256;
+        pullBefore.message = pulled.message;
         pushResult.status = 'skipped';
         pushResult.message = 'Skipped push after pull-preferred bootstrap.';
         pullAfter.status = 'unchanged';
-        pullAfter.sha256 = pulled.result.sha256;
+        pullAfter.sha256 = pulled.sha256;
         pullAfter.message = 'No final pull required.';
         return { pullBefore, push: pushResult, pullAfter };
       }
 
       if (localSnapshot) {
         const pushed = await applyPush(credential, localSnapshot);
-        pushResult.status = pushed.result.status;
-        pushResult.sha256 = pushed.result.sha256;
-        pushResult.message = pushed.result.message;
+        pushResult.status = pushed.status;
+        pushResult.sha256 = pushed.sha256;
+        pushResult.message = pushed.message;
         pullBefore.status = 'skipped';
         pullBefore.message = 'Skipped initial pull during push-preferred bootstrap.';
         pullAfter.status = 'skipped';
@@ -458,9 +453,9 @@ export function createTursoSessionBackend(options: {
 
     if (localChanged && !remoteChanged && localSnapshot) {
       const pushed = await applyPush(credential, localSnapshot);
-      pushResult.status = pushed.result.status;
-      pushResult.sha256 = pushed.result.sha256;
-      pushResult.message = pushed.result.message;
+      pushResult.status = pushed.status;
+      pushResult.sha256 = pushed.sha256;
+      pushResult.message = pushed.message;
       return { pullBefore, push: pushResult, pullAfter };
     }
 
@@ -473,9 +468,9 @@ export function createTursoSessionBackend(options: {
       }
 
       const pulled = await applyPull(credential, remoteSnapshot);
-      pullBefore.status = pulled.result.status;
-      pullBefore.sha256 = pulled.result.sha256;
-      pullBefore.message = pulled.result.message;
+      pullBefore.status = pulled.status;
+      pullBefore.sha256 = pulled.sha256;
+      pullBefore.message = pulled.message;
       return { pullBefore, push: pushResult, pullAfter };
     }
 
@@ -489,25 +484,25 @@ export function createTursoSessionBackend(options: {
         }
 
         const pulled = await applyPull(credential, remoteSnapshot);
-        pullBefore.status = pulled.result.status;
-        pullBefore.sha256 = pulled.result.sha256;
-        pullBefore.message = `${pulled.result.message} (resolved by pull preference)`;
+        pullBefore.status = pulled.status;
+        pullBefore.sha256 = pulled.sha256;
+        pullBefore.message = `${pulled.message} (resolved by pull preference)`;
         return { pullBefore, push: pushResult, pullAfter };
       }
 
       if (shouldPreferPush && localSnapshot) {
         const pushed = await applyPush(credential, localSnapshot);
-        pushResult.status = pushed.result.status;
-        pushResult.sha256 = pushed.result.sha256;
-        pushResult.message = `${pushed.result.message} (resolved by push preference)`;
+        pushResult.status = pushed.status;
+        pushResult.sha256 = pushed.sha256;
+        pushResult.message = `${pushed.message} (resolved by push preference)`;
         return { pullBefore, push: pushResult, pullAfter };
       }
 
       if (localSnapshot) {
         const pushed = await applyPush(credential, localSnapshot);
-        pushResult.status = pushed.result.status;
-        pushResult.sha256 = pushed.result.sha256;
-        pushResult.message = `${pushed.result.message} (resolved by auto preference)`;
+        pushResult.status = pushed.status;
+        pushResult.sha256 = pushed.sha256;
+        pushResult.message = `${pushed.message} (resolved by auto preference)`;
         return { pullBefore, push: pushResult, pullAfter };
       }
     }
@@ -521,9 +516,9 @@ export function createTursoSessionBackend(options: {
       }
 
       const pulled = await applyPull(credential, remoteSnapshot);
-      pullBefore.status = pulled.result.status;
-      pullBefore.sha256 = pulled.result.sha256;
-      pullBefore.message = pulled.result.message;
+      pullBefore.status = pulled.status;
+      pullBefore.sha256 = pulled.sha256;
+      pullBefore.message = pulled.message;
       return { pullBefore, push: pushResult, pullAfter };
     }
 

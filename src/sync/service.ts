@@ -419,7 +419,8 @@ export function createSyncService(ctx: SyncServiceContext): SyncService {
   };
 
   const flushQueuedTursoSync = async (
-    trigger: string
+    trigger: string,
+    latestConfig?: NormalizedSyncConfig | null
   ): Promise<{ summary?: string; warning?: string; deferred: boolean }> => {
     if (pendingTursoSyncReasons.size === 0) {
       return { deferred: false };
@@ -430,7 +431,7 @@ export function createSyncService(ctx: SyncServiceContext): SyncService {
 
     tursoFlushInFlight = true;
     try {
-      const latest = await loadSyncConfig(locations);
+      const latest = latestConfig ?? (await loadSyncConfig(locations));
       if (!latest || !isTursoSessionBackend(latest)) {
         pendingTursoSyncReasons.clear();
         stopTursoSyncLoop();
@@ -496,7 +497,7 @@ export function createSyncService(ctx: SyncServiceContext): SyncService {
     }
 
     queueTursoSync('startup');
-    const result = await flushQueuedTursoSync('startup');
+    const result = await flushQueuedTursoSync('startup', config);
     if (result.deferred) {
       scheduleTursoIdleFlush();
       return 'Turso startup sync deferred until all sessions are idle.';
@@ -532,7 +533,7 @@ export function createSyncService(ctx: SyncServiceContext): SyncService {
         }
 
         queueTursoSync('background');
-        const result = await flushQueuedTursoSync('background');
+        const result = await flushQueuedTursoSync('background', latest);
         if (result.deferred) {
           return;
         }
