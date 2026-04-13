@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { normalizeSyncConfig } from './config.js';
 import type { SyncLocations } from './paths.js';
 import {
+  estimateBase64EncodedLength,
+  estimateSnapshotPayloadBase64Bytes,
   extractHeadlessLoginHints,
   extractRows,
   isRetryableTursoError,
+  isSnapshotPayloadSizeAllowed,
+  MAX_TURSO_SNAPSHOT_BASE64_BYTES,
   resolveSessionDbPaths,
   resolveTursoCredentialPath,
   resolveTursoDatabaseName,
@@ -119,5 +123,29 @@ describe('extractRows', () => {
   it('returns empty list when result has no rows', () => {
     expect(extractRows({ type: 'ok' })).toEqual([]);
     expect(extractRows(null)).toEqual([]);
+  });
+});
+
+describe('snapshot payload sizing', () => {
+  it('estimates base64 length for byte counts', () => {
+    expect(estimateBase64EncodedLength(0)).toBe(0);
+    expect(estimateBase64EncodedLength(1)).toBe(4);
+    expect(estimateBase64EncodedLength(2)).toBe(4);
+    expect(estimateBase64EncodedLength(3)).toBe(4);
+    expect(estimateBase64EncodedLength(4)).toBe(8);
+  });
+
+  it('estimates combined snapshot payload size', () => {
+    const total = estimateSnapshotPayloadBase64Bytes({
+      dbByteLength: 4,
+      walByteLength: 3,
+      shmByteLength: 1,
+    });
+    expect(total).toBe(16);
+  });
+
+  it('checks whether snapshot payload size is within limit', () => {
+    expect(isSnapshotPayloadSizeAllowed(MAX_TURSO_SNAPSHOT_BASE64_BYTES)).toBe(true);
+    expect(isSnapshotPayloadSizeAllowed(MAX_TURSO_SNAPSHOT_BASE64_BYTES + 1)).toBe(false);
   });
 });

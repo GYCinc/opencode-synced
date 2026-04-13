@@ -11,6 +11,9 @@ import type { SyncLocations } from './paths.js';
 const SESSION_SYNC_TABLE = 'opencode_session_sync_snapshot';
 const CREDENTIAL_VERSION = 1;
 const TURSO_INSTALL_SCRIPT = 'curl -sSfL https://get.tur.so/install.sh | bash';
+const TURSO_SQL_TIMEOUT_MS = 30_000;
+const TURSO_PROCESS_KILL_GRACE_MS = 2_000;
+export const MAX_TURSO_SNAPSHOT_BASE64_BYTES = 8 * 1024 * 1024;
 const TURSO_EXECUTABLE_CANDIDATES = [
   'turso',
   '/opt/homebrew/bin/turso',
@@ -60,6 +63,11 @@ interface TursoCommandResult {
   stdout: string;
   stderr: string;
   timedOut: boolean;
+}
+
+interface TimeoutSignalHandle {
+  signal: AbortSignal;
+  cleanup: () => void;
 }
 
 export interface TursoSyncLogger {
@@ -609,6 +617,29 @@ export function isRetryableTursoError(error: unknown): boolean {
   ].some((token) => message.includes(token));
 }
 
+export function estimateBase64EncodedLength(byteLength: number): number {
+  if (!Number.isFinite(byteLength) || byteLength <= 0) {
+    return 0;
+  }
+  return Math.ceil(byteLength / 3) * 4;
+}
+
+export function estimateSnapshotPayloadBase64Bytes(input: {
+  dbByteLength: number;
+  walByteLength?: number | null;
+  shmByteLength?: number | null;
+}): number {
+  return (
+    estimateBase64EncodedLength(input.dbByteLength) +
+    estimateBase64EncodedLength(input.walByteLength ?? 0) +
+    estimateBase64EncodedLength(input.shmByteLength ?? 0)
+  );
+}
+
+export function isSnapshotPayloadSizeAllowed(totalBase64Bytes: number): boolean {
+  return totalBase64Bytes <= MAX_TURSO_SNAPSHOT_BASE64_BYTES;
+}
+
 function sanitizeDatabaseName(input: string): string {
   const cleaned = input
     .trim()
@@ -712,7 +743,7 @@ async function ensureTursoExecutable(
   }
 
   if (process.platform !== 'win32') {
-    const installScript = await runCommand('bash', ['-lc', TURSO_INSTALL_SCRIPT], {
+    const installScript = await runCommand('bash', ['-c', TURSO_INSTALL_SCRIPT], {
       timeoutMs: 120000,
     });
     if (installScript.code !== 0) {
@@ -914,11 +945,29 @@ async function runCommand(
     let stderr = '';
     let timedOut = false;
     let timeout: NodeJS.Timeout | null = null;
+    let forceKillTimeout: NodeJS.Timeout | null = null;
+
+    const clearCommandTimers = (): void => {
+      if (timeout) clearTimeout(timeout);
+      if (forceKillTimeout) clearTimeout(forceKillTimeout);
+    };
 
     if (options.timeoutMs && options.timeoutMs > 0) {
       timeout = setTimeout(() => {
         timedOut = true;
-        child.kill('SIGTERM');
+        try {
+          child.kill('SIGTERM');
+        } catch {
+          return;
+        }
+        forceKillTimeout = setTimeout(() => {
+          if (child.exitCode !== null || child.signalCode !== null) return;
+          try {
+            child.kill('SIGKILL');
+          } catch {
+            // Process can already be gone by the time fallback runs.
+          }
+        }, TURSO_PROCESS_KILL_GRACE_MS);
       }, options.timeoutMs);
     }
 
@@ -930,12 +979,12 @@ async function runCommand(
     });
 
     child.on('error', (error) => {
-      if (timeout) clearTimeout(timeout);
+      clearCommandTimers();
       reject(error);
     });
 
     child.on('close', (code) => {
-      if (timeout) clearTimeout(timeout);
+      clearCommandTimers();
       resolve({
         code: code ?? 1,
         stdout,
@@ -1002,7 +1051,7 @@ async function writeLocalSessionSnapshot(
 
 async function writeBufferAtomically(targetPath: string, payload: Buffer): Promise<void> {
   await fs.mkdir(path.dirname(targetPath), { recursive: true });
-  const tempPath = `${targetPath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const tempPath = `${targetPath}.tmp-${process.pid}-${Date.now()}-${crypto.randomUUID()}`;
   await fs.writeFile(tempPath, payload, { mode: 0o600 });
   await fs.rename(tempPath, targetPath);
 }
@@ -1103,6 +1152,22 @@ async function upsertRemoteSnapshot(
   snapshot: SessionSnapshot,
   machineId: string
 ): Promise<void> {
+  const dbPayloadBase64 = snapshot.db.toString('base64');
+  const walPayloadBase64 = snapshot.wal ? snapshot.wal.toString('base64') : null;
+  const shmPayloadBase64 = snapshot.shm ? snapshot.shm.toString('base64') : null;
+  const payloadBase64Bytes = estimateSnapshotPayloadBase64Bytes({
+    dbByteLength: snapshot.db.byteLength,
+    walByteLength: snapshot.wal?.byteLength,
+    shmByteLength: snapshot.shm?.byteLength,
+  });
+  if (!isSnapshotPayloadSizeAllowed(payloadBase64Bytes)) {
+    throw new SyncCommandError(
+      `Session snapshot payload is too large for Turso upload ` +
+        `(${payloadBase64Bytes} base64 bytes; max ${MAX_TURSO_SNAPSHOT_BASE64_BYTES}). ` +
+        'Chunked uploads are not supported yet.'
+    );
+  }
+
   const upsert = [
     `INSERT INTO ${SESSION_SYNC_TABLE} (`,
     'id, updated_at, machine_id, payload_sha256, payload_db_b64, payload_wal_b64, payload_shm_b64',
@@ -1120,9 +1185,9 @@ async function upsertRemoteSnapshot(
     { type: 'text', value: new Date().toISOString() },
     { type: 'text', value: machineId },
     { type: 'text', value: snapshot.sha256 },
-    { type: 'text', value: snapshot.db.toString('base64') },
-    snapshot.wal ? { type: 'text', value: snapshot.wal.toString('base64') } : { type: 'null' },
-    snapshot.shm ? { type: 'text', value: snapshot.shm.toString('base64') } : { type: 'null' },
+    { type: 'text', value: dbPayloadBase64 },
+    walPayloadBase64 ? { type: 'text', value: walPayloadBase64 } : { type: 'null' },
+    shmPayloadBase64 ? { type: 'text', value: shmPayloadBase64 } : { type: 'null' },
   ];
 
   await executeSql(credential, upsert, args);
@@ -1172,14 +1237,26 @@ async function executeSql(
     ],
   };
 
-  const response = await fetch(`${credential.httpUrl}/v2/pipeline`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${credential.token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
+  const timeout = createTimeoutSignal(TURSO_SQL_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(`${credential.httpUrl}/v2/pipeline`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${credential.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: timeout.signal,
+    });
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw new SyncCommandError(`Turso SQL request timed out after ${TURSO_SQL_TIMEOUT_MS}ms.`);
+    }
+    throw new SyncCommandError(`Turso SQL request failed: ${formatUnknownError(error)}`);
+  } finally {
+    timeout.cleanup();
+  }
 
   const text = await response.text();
   if (!response.ok) {
@@ -1263,4 +1340,30 @@ function decodeSqlCellToText(cell: unknown): string | null {
 
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '');
+}
+
+function createTimeoutSignal(timeoutMs: number): TimeoutSignalHandle {
+  const abortSignalWithTimeout = AbortSignal as typeof AbortSignal & {
+    timeout?: (_ms: number) => AbortSignal;
+  };
+  if (typeof abortSignalWithTimeout.timeout === 'function') {
+    return { signal: abortSignalWithTimeout.timeout(timeoutMs), cleanup: () => {} };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      clearTimeout(timeout);
+    },
+  };
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError';
+}
+
+function formatUnknownError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
