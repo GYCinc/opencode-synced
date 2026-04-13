@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented here by Release Please.
 
+## [0.10.0](https://github.com/iHildy/opencode-synced/compare/v0.9.0...v0.10.0) (2026-04-13)
+
+
+### Features
+
+* add isolated GitHub two-instance E2E workflow ([#52](https://github.com/iHildy/opencode-synced/issues/52)) ([e5c338f](https://github.com/iHildy/opencode-synced/commit/e5c338f99630a34bc6741e2524ab7fad1d611fbb))
+* add secrets backend config support ([f6a56e2](https://github.com/iHildy/opencode-synced/commit/f6a56e28b2f34dd6f6ba08d3cebfc3fc30806048))
+* add secrets sync commands ([c29d63a](https://github.com/iHildy/opencode-synced/commit/c29d63a2895eac43c4bb401bfed2597e38fe762d))
+* integrate 1Password secrets backend ([ca6a5bb](https://github.com/iHildy/opencode-synced/commit/ca6a5bb927402d1b302a8691a6add200ea00f3e1))
+* sync skills directory by default ([#56](https://github.com/iHildy/opencode-synced/issues/56)) ([a627673](https://github.com/iHildy/opencode-synced/commit/a627673f7a00f9cdcdefe168ba110803c0678b3a))
+
+
+### Bug Fixes
+
+* address secrets backend review ([f2eb33b](https://github.com/iHildy/opencode-synced/commit/f2eb33b9ea605a17230b5d43dae9891a59822d0b))
+* expand e2e coverage and docs for session sync compatibility ([#53](https://github.com/iHildy/opencode-synced/issues/53)) ([78a4f88](https://github.com/iHildy/opencode-synced/commit/78a4f88ad12d72f911c0fa0e7704ff0e305e9852))
+* guard secrets backend validation before actions ([790f850](https://github.com/iHildy/opencode-synced/commit/790f85039b9a2c30ac66979ffdee8d426234e798))
+* harden secrets backend integration ([5c37236](https://github.com/iHildy/opencode-synced/commit/5c37236ec76c27125adc9e99156e87622bf9ea8b))
+* preserve original 1password errors ([e67d675](https://github.com/iHildy/opencode-synced/commit/e67d6755a0c2024782b4eb2ec6da73f4a2223344))
+* sync opencode-synced config ([034bbe8](https://github.com/iHildy/opencode-synced/commit/034bbe8feb72cf4f2306399788dca5d897d50283))
+
 ## [0.9.0](https://github.com/iHildy/opencode-synced/compare/v0.8.0...v0.9.0) (2026-01-29)
 
 
