@@ -63,6 +63,8 @@ interface InitOptions {
   includeSessions?: boolean;
   includePromptStash?: boolean;
   includeModelFavorites?: boolean;
+  includeSkills?: boolean;
+  includeAgentsDir?: boolean;
   create?: boolean;
   private?: boolean;
   extraSecretPaths?: string[];
@@ -317,6 +319,8 @@ export function createSyncService(ctx: SyncServiceContext): SyncService {
       const includeSessions = config.includeSessions ? 'enabled' : 'disabled';
       const includePromptStash = config.includePromptStash ? 'enabled' : 'disabled';
       const includeModelFavorites = config.includeModelFavorites ? 'enabled' : 'disabled';
+      const includeSkills = config.includeSkills ? 'enabled' : 'disabled';
+      const includeAgentsDir = config.includeAgentsDir ? 'enabled' : 'disabled';
       const secretsBackend = config.secretsBackend?.type ?? 'none';
       const lastPull = state.lastPull ?? 'never';
       const lastPush = state.lastPush ?? 'never';
@@ -340,6 +344,8 @@ export function createSyncService(ctx: SyncServiceContext): SyncService {
         `Sessions: ${includeSessions}`,
         `Prompt stash: ${includePromptStash}`,
         `Model favorites: ${includeModelFavorites}`,
+        `Skills: ${includeSkills}`,
+        `Home .agents: ${includeAgentsDir}`,
         `Last pull: ${lastPull}`,
         `Last push: ${lastPush}`,
         `Working tree: ${changesLabel}`,
@@ -767,6 +773,8 @@ async function buildConfigFromInit($: Shell, options: InitOptions) {
     includeSessions: options.includeSessions ?? false,
     includePromptStash: options.includePromptStash ?? false,
     includeModelFavorites: options.includeModelFavorites ?? true,
+    includeSkills: options.includeSkills ?? true,
+    includeAgentsDir: options.includeAgentsDir ?? true,
     extraSecretPaths: options.extraSecretPaths ?? [],
     extraConfigPaths: options.extraConfigPaths ?? [],
     localRepoPath: options.localRepoPath,
