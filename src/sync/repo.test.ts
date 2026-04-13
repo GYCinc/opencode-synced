@@ -35,6 +35,13 @@ describe('parseRepoReference', () => {
     });
   });
 
+  it('parses GitHub ssh:// repo URLs', () => {
+    expect(parseRepoReference('ssh://git@github.com/acme/opencode-sync.git', 'ignored')).toEqual({
+      owner: 'acme',
+      name: 'opencode-sync',
+    });
+  });
+
   it('parses GitHub SSH repo URLs', () => {
     expect(parseRepoReference('git@github.com:acme/opencode-sync.git', 'ignored')).toEqual({
       owner: 'acme',
@@ -42,9 +49,20 @@ describe('parseRepoReference', () => {
     });
   });
 
+  it('parses GitHub SSH repo URLs with trailing slash', () => {
+    expect(parseRepoReference('git@github.com:acme/opencode-sync.git/', 'ignored')).toEqual({
+      owner: 'acme',
+      name: 'opencode-sync',
+    });
+  });
+
   it('returns null for invalid repo references', () => {
     expect(parseRepoReference('https://example.com/acme/opencode-sync', 'ignored')).toBeNull();
+    expect(
+      parseRepoReference('https://github.com/acme/opencode-sync/issues', 'ignored')
+    ).toBeNull();
     expect(parseRepoReference('acme/opencode/sync', 'ignored')).toBeNull();
+    expect(parseRepoReference('git@notgithub:acme/opencode-sync', 'ignored')).toBeNull();
     expect(parseRepoReference('   ', 'ihildy')).toBeNull();
   });
 });

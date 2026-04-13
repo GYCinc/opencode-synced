@@ -295,6 +295,7 @@ export function parseRepoReference(input: string, fallbackOwner: string): RepoRe
     const parts = raw.split('/').filter(Boolean);
     if (parts.length !== 2) return null;
     const [owner, repoRaw] = parts;
+    if (owner.includes(':') || owner.includes('@')) return null;
     const name = normalizeRepoName(repoRaw);
     if (!owner || !name) return null;
     return { owner, name };
@@ -360,11 +361,15 @@ function parseGitHubHttpRepo(raw: string): RepoReference | null {
     return null;
   }
 
-  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:' && parsed.protocol !== 'ssh:') {
+    return null;
+  }
   if (parsed.hostname !== 'github.com' && parsed.hostname !== 'www.github.com') return null;
+  if (parsed.protocol === 'ssh:' && parsed.username !== 'git') return null;
 
-  const [ownerRaw = '', repoRaw = ''] = parsed.pathname.split('/').filter(Boolean);
-  if (!ownerRaw || !repoRaw) return null;
+  const parts = parsed.pathname.split('/').filter(Boolean);
+  if (parts.length !== 2) return null;
+  const [ownerRaw = '', repoRaw = ''] = parts;
 
   const name = normalizeRepoName(repoRaw);
   if (!name) return null;
@@ -372,7 +377,7 @@ function parseGitHubHttpRepo(raw: string): RepoReference | null {
 }
 
 function parseGitHubSshRepo(raw: string): RepoReference | null {
-  const match = raw.match(/^git@github\.com:([^/\s]+)\/([^/\s]+)$/i);
+  const match = raw.match(/^git@github\.com:([^/\s]+)\/([^/\s]+)\/?$/i);
   if (!match) return null;
   const owner = match[1] ?? '';
   const name = normalizeRepoName(match[2] ?? '');
