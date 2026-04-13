@@ -288,8 +288,7 @@ export function buildSyncPlan(
 
   const extraConfigPaths = (config.extraConfigPaths ?? []).filter(
     (entry) =>
-      !isSamePath(entry, locations.syncConfigPath, locations.xdg.homeDir, platform) &&
-      !isSamePath(entry, path.join(configRoot, 'skills'), locations.xdg.homeDir, platform)
+      !items.some((item) => isSamePath(entry, item.localPath, locations.xdg.homeDir, platform))
   );
 
   const extraConfigs = buildExtraPathPlan(
