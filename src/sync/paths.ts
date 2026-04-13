@@ -216,7 +216,7 @@ export function buildSyncPlan(
     });
   }
 
-  if (config.includeSkills !== false) {
+  if (config.includeOpencodeSkills !== false) {
     items.push({
       localPath: path.join(configRoot, SKILLS_DIR),
       repoPath: path.join(repoConfigRoot, SKILLS_DIR),

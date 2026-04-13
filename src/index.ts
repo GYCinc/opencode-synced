@@ -152,7 +152,7 @@ export const opencodeConfigSync: Plugin = async (ctx) => {
         .boolean()
         .optional()
         .describe('Sync model favorites (state/model.json)'),
-      includeSkills: tool.schema
+      includeOpencodeSkills: tool.schema
         .boolean()
         .optional()
         .describe('Sync ~/.config/opencode/skills directory'),
@@ -180,7 +180,7 @@ export const opencodeConfigSync: Plugin = async (ctx) => {
             includeSessions: args.includeSessions,
             includePromptStash: args.includePromptStash,
             includeModelFavorites: args.includeModelFavorites,
-            includeSkills: args.includeSkills,
+            includeOpencodeSkills: args.includeOpencodeSkills,
             includeAgentsDir: args.includeAgentsDir,
             create: args.create,
             private: args.private,

@@ -81,13 +81,16 @@ describe('normalizeSyncConfig', () => {
 
   it('enables skills and home .agents by default', () => {
     const normalized = normalizeSyncConfig({});
-    expect(normalized.includeSkills).toBe(true);
+    expect(normalized.includeOpencodeSkills).toBe(true);
     expect(normalized.includeAgentsDir).toBe(true);
   });
 
   it('allows disabling skills and home .agents', () => {
-    const normalized = normalizeSyncConfig({ includeSkills: false, includeAgentsDir: false });
-    expect(normalized.includeSkills).toBe(false);
+    const normalized = normalizeSyncConfig({
+      includeOpencodeSkills: false,
+      includeAgentsDir: false,
+    });
+    expect(normalized.includeOpencodeSkills).toBe(false);
     expect(normalized.includeAgentsDir).toBe(false);
   });
 

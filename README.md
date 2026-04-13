@@ -77,7 +77,7 @@ Create `~/.config/opencode/opencode-synced.jsonc`:
   "includeSessions": false,
   "includePromptStash": false,
   "includeModelFavorites": true,
-  "includeSkills": true,
+  "includeOpencodeSkills": true,
   "includeAgentsDir": true,
   "extraSecretPaths": [],
   "extraConfigPaths": [],
@@ -96,7 +96,7 @@ Create `~/.config/opencode/opencode-synced.jsonc`:
 - Any additional paths in `extraConfigPaths` (allowlist, files or folders). You do not need to include default paths like `~/.config/opencode/skills` or `~/.agents`.
 
 Disable default directory sync by setting:
-- `"includeSkills": false` to skip `~/.config/opencode/skills/`
+- `"includeOpencodeSkills": false` to skip `~/.config/opencode/skills/`
 - `"includeAgentsDir": false` to skip `~/.agents/`
 
 ### Secrets (private repos only)

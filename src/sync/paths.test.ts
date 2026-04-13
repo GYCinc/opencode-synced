@@ -104,7 +104,7 @@ describe('buildSyncPlan', () => {
     expect(skillsItem?.type).toBe('dir');
 
     const disabledPlan = buildSyncPlan(
-      normalizeSyncConfig({ ...config, includeSkills: false }),
+      normalizeSyncConfig({ ...config, includeOpencodeSkills: false }),
       locations,
       '/repo',
       'linux'

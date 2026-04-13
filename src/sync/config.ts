@@ -32,7 +32,7 @@ export interface SyncConfig {
   includeSessions?: boolean;
   includePromptStash?: boolean;
   includeModelFavorites?: boolean;
-  includeSkills?: boolean;
+  includeOpencodeSkills?: boolean;
   includeAgentsDir?: boolean;
   secretsBackend?: SecretsBackendConfig;
   extraSecretPaths?: string[];
@@ -45,7 +45,7 @@ export interface NormalizedSyncConfig extends SyncConfig {
   includeSessions: boolean;
   includePromptStash: boolean;
   includeModelFavorites: boolean;
-  includeSkills: boolean;
+  includeOpencodeSkills: boolean;
   includeAgentsDir: boolean;
   secretsBackend?: SecretsBackendConfig;
   extraSecretPaths: string[];
@@ -110,7 +110,7 @@ export function normalizeSecretsBackend(
 export function normalizeSyncConfig(config: SyncConfig): NormalizedSyncConfig {
   const includeSecrets = Boolean(config.includeSecrets);
   const includeModelFavorites = config.includeModelFavorites !== false;
-  const includeSkills = config.includeSkills !== false;
+  const includeOpencodeSkills = config.includeOpencodeSkills !== false;
   const includeAgentsDir = config.includeAgentsDir !== false;
   return {
     includeSecrets,
@@ -118,7 +118,7 @@ export function normalizeSyncConfig(config: SyncConfig): NormalizedSyncConfig {
     includeSessions: Boolean(config.includeSessions),
     includePromptStash: Boolean(config.includePromptStash),
     includeModelFavorites,
-    includeSkills,
+    includeOpencodeSkills,
     includeAgentsDir,
     secretsBackend: normalizeSecretsBackend(config.secretsBackend),
     extraSecretPaths: Array.isArray(config.extraSecretPaths) ? config.extraSecretPaths : [],
