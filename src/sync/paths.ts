@@ -52,11 +52,13 @@ const DEFAULT_SYNC_CONFIG_NAME = 'opencode-synced.jsonc';
 const DEFAULT_OVERRIDES_NAME = 'opencode-synced.overrides.jsonc';
 const DEFAULT_STATE_NAME = 'sync-state.json';
 
-const CONFIG_DIRS = ['agent', 'command', 'mode', 'tool', 'themes', 'plugin', 'skills'];
+const CONFIG_DIRS = ['agent', 'command', 'mode', 'tool', 'themes', 'plugin'];
 const SESSION_DIRS = ['storage/session', 'storage/message', 'storage/part', 'storage/session_diff'];
 const SESSION_DB_FILE = 'opencode.db';
 const PROMPT_STASH_FILES = ['prompt-stash.jsonl', 'prompt-history.jsonl'];
 const MODEL_FAVORITES_FILE = 'model.json';
+const SKILLS_DIR = 'skills';
+const HOME_AGENTS_DIR = '.agents';
 
 export function resolveHomeDir(
   env: NodeJS.ProcessEnv = process.env,
@@ -210,6 +212,26 @@ export function buildSyncPlan(
     items.push({
       localPath: path.join(configRoot, dirName),
       repoPath: path.join(repoConfigRoot, dirName),
+      type: 'dir',
+      isSecret: false,
+      isConfigFile: false,
+    });
+  }
+
+  if (config.includeOpencodeSkills !== false) {
+    items.push({
+      localPath: path.join(configRoot, SKILLS_DIR),
+      repoPath: path.join(repoConfigRoot, SKILLS_DIR),
+      type: 'dir',
+      isSecret: false,
+      isConfigFile: false,
+    });
+  }
+
+  if (config.includeAgentsDir !== false) {
+    items.push({
+      localPath: path.join(locations.xdg.homeDir, HOME_AGENTS_DIR),
+      repoPath: path.join(repoConfigRoot, HOME_AGENTS_DIR),
       type: 'dir',
       isSecret: false,
       isConfigFile: false,
