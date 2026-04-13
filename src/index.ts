@@ -270,6 +270,9 @@ export const opencodeConfigSync: Plugin = async (ctx) => {
     tool: {
       opencode_sync: syncTool,
     },
+    async event(input) {
+      await service.handleEvent(input.event);
+    },
     async config(config) {
       config.command = config.command ?? {};
 

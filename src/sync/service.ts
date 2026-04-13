@@ -30,6 +30,7 @@ import {
   getRepoStatus,
   hasLocalChanges,
   isRepoCloned,
+  parseRepoReference,
   pushBranch,
   repoExists,
   resolveRepoBranch,
@@ -42,7 +43,11 @@ import {
   resolveSecretsBackendConfig,
   type SecretsBackend,
 } from './secrets-backend.js';
-import { createTursoSessionBackend, isRetryableTursoError } from './turso.js';
+import {
+  createTursoSessionBackend,
+  isRetryableTursoError,
+  type TursoSyncPreference,
+} from './turso.js';
 import {
   createLogger,
   extractTextFromResponse,
@@ -82,6 +87,7 @@ interface LinkOptions {
 
 export interface SyncService {
   startupSync: () => Promise<void>;
+  handleEvent: (_event: unknown) => Promise<void>;
   status: () => Promise<string>;
   init: (_options: InitOptions) => Promise<string>;
   link: (_options: LinkOptions) => Promise<string>;
@@ -109,8 +115,15 @@ export function createSyncService(ctx: SyncServiceContext): SyncService {
   const locations = resolveSyncLocations();
   const log = createLogger(ctx.client);
   const lockPath = path.join(path.dirname(locations.statePath), 'sync.lock');
+  const strictLinkRepo = resolveStrictLinkRepo(process.env.OPENCODE_SYNC_E2E_STRICT_LINK_REPO);
+  const disableAutoRepoDiscovery =
+    process.env.OPENCODE_SYNC_E2E_DISABLE_AUTO_REPO_DISCOVERY === '1' || strictLinkRepo !== null;
   let tursoSyncTimer: ReturnType<typeof setInterval> | null = null;
   let tursoSyncIntervalSec = 15;
+  const activeSessionIds = new Set<string>();
+  const pendingTursoSyncReasons = new Set<string>();
+  let tursoIdleFlushTimer: ReturnType<typeof setTimeout> | null = null;
+  let tursoFlushInFlight = false;
 
   const formatLockInfo = (info: SyncLockInfo | null): string => {
     if (!info) return 'Another sync is already in progress.';
@@ -270,6 +283,10 @@ export function createSyncService(ctx: SyncServiceContext): SyncService {
     if (!tursoSyncTimer) return;
     clearInterval(tursoSyncTimer);
     tursoSyncTimer = null;
+    if (tursoIdleFlushTimer) {
+      clearTimeout(tursoIdleFlushTimer);
+      tursoIdleFlushTimer = null;
+    }
   };
 
   const sleep = async (ms: number): Promise<void> =>
@@ -283,6 +300,20 @@ export function createSyncService(ctx: SyncServiceContext): SyncService {
     pullAfter: { status: string };
   }): string => {
     return `Turso sessions cycle: pull=${cycle.pullBefore.status}, push=${cycle.push.status}, pull=${cycle.pullAfter.status}`;
+  };
+
+  const resolveTursoPreferenceFromReasons = (
+    reasons: string[],
+    trigger: string
+  ): TursoSyncPreference => {
+    const values = [trigger, ...reasons].map((entry) => entry.toLowerCase());
+    const hasPush = values.some((entry) => entry.includes('push') || entry.includes('migrate'));
+    const hasPull = values.some(
+      (entry) => entry.includes('pull') || entry.includes('startup') || entry.includes('link')
+    );
+    if (hasPush) return 'push';
+    if (hasPull) return 'pull';
+    return 'auto';
   };
 
   const runTursoSetup = async (
@@ -300,15 +331,18 @@ export function createSyncService(ctx: SyncServiceContext): SyncService {
   const runTursoCycleWithRetry = async (
     config: NormalizedSyncConfig,
     reason: string,
-    attempts = 3
+    options: { attempts?: number; preference?: TursoSyncPreference; allowLocalPull?: boolean } = {}
   ): Promise<{ summary: string }> => {
     const backend = createTursoSessionBackend({ locations, config, log });
+    const attempts = options.attempts ?? 3;
+    const preference = options.preference ?? 'auto';
+    const allowLocalPull = options.allowLocalPull ?? true;
     let backoffMs = 500;
     let attempt = 1;
 
     while (attempt <= attempts) {
       try {
-        const cycle = await backend.syncCycle();
+        const cycle = await backend.syncCycle({ preference, allowLocalPull });
         const now = new Date().toISOString();
         const stateUpdate: { lastSessionPull?: string; lastSessionPush?: string } = {};
         if (cycle.pullBefore.status !== 'skipped' || cycle.pullAfter.status !== 'skipped') {
@@ -328,6 +362,8 @@ export function createSyncService(ctx: SyncServiceContext): SyncService {
           log.warn('Retrying Turso session sync cycle', {
             reason,
             attempt,
+            preference,
+            allowLocalPull,
             error: formatError(error),
             backoffMs,
           });
@@ -343,19 +379,114 @@ export function createSyncService(ctx: SyncServiceContext): SyncService {
     throw new SyncCommandError(`Turso session sync failed after ${attempts} attempts (${reason}).`);
   };
 
+  const refreshActiveSessionsFromServer = async (): Promise<boolean> => {
+    try {
+      const response = await ctx.client.session.status({});
+      const statusMap = unwrapData<Record<string, unknown>>(response);
+      if (!isRecord(statusMap)) {
+        return false;
+      }
+
+      activeSessionIds.clear();
+      for (const [sessionId, status] of Object.entries(statusMap)) {
+        if (isBusySessionStatus(status)) {
+          activeSessionIds.add(sessionId);
+        }
+      }
+      return true;
+    } catch (error) {
+      log.warn('Failed to query session activity state', { error: formatError(error) });
+      return false;
+    }
+  };
+
+  const areAllSessionsIdle = async (): Promise<boolean> => {
+    const first = await refreshActiveSessionsFromServer();
+    if (!first || activeSessionIds.size > 0) {
+      return false;
+    }
+    await sleep(200);
+
+    const second = await refreshActiveSessionsFromServer();
+    if (!second) {
+      return false;
+    }
+    return activeSessionIds.size === 0;
+  };
+
+  const queueTursoSync = (reason: string): void => {
+    pendingTursoSyncReasons.add(reason);
+  };
+
+  const flushQueuedTursoSync = async (
+    trigger: string,
+    latestConfig?: NormalizedSyncConfig | null
+  ): Promise<{ summary?: string; warning?: string; deferred: boolean }> => {
+    if (pendingTursoSyncReasons.size === 0) {
+      return { deferred: false };
+    }
+    if (tursoFlushInFlight) {
+      return { deferred: true };
+    }
+
+    tursoFlushInFlight = true;
+    try {
+      const latest = latestConfig ?? (await loadSyncConfig(locations));
+      if (!latest || !isTursoSessionBackend(latest)) {
+        pendingTursoSyncReasons.clear();
+        stopTursoSyncLoop();
+        return { deferred: false };
+      }
+
+      const idle = await areAllSessionsIdle();
+      if (!idle) {
+        return { deferred: true };
+      }
+
+      const reasons = [...pendingTursoSyncReasons];
+      pendingTursoSyncReasons.clear();
+      const preference = resolveTursoPreferenceFromReasons(reasons, trigger);
+      const allowLocalPull = trigger === 'startup';
+
+      try {
+        const cycle = await runTursoCycleWithRetry(latest, `${trigger}:${reasons.join(',')}`, {
+          preference,
+          allowLocalPull,
+        });
+        return { summary: cycle.summary, deferred: false };
+      } catch (error) {
+        for (const reason of reasons) {
+          pendingTursoSyncReasons.add(reason);
+        }
+        const warning = `Turso session sync warning: ${formatError(error)}`;
+        log.warn(warning, { trigger, reasons });
+        return { warning, deferred: false };
+      }
+    } finally {
+      tursoFlushInFlight = false;
+    }
+  };
+
+  const scheduleTursoIdleFlush = (): void => {
+    if (tursoIdleFlushTimer) {
+      return;
+    }
+    tursoIdleFlushTimer = setTimeout(() => {
+      tursoIdleFlushTimer = null;
+      void skipIfBusy(async () => {
+        await flushQueuedTursoSync('idle-event');
+      });
+    }, 250);
+  };
+
   const runForegroundTursoCycle = async (
     config: NormalizedSyncConfig,
     reason: string
   ): Promise<string | null> => {
     if (!isTursoSessionBackend(config)) return null;
-    try {
-      const cycle = await runTursoCycleWithRetry(config, reason);
-      return cycle.summary;
-    } catch (error) {
-      const warning = `Turso session sync warning: ${formatError(error)}`;
-      log.warn(warning, { reason });
-      return warning;
-    }
+    queueTursoSync(reason);
+    scheduleTursoIdleFlush();
+    return 'Turso sessions sync queued; runtime local pull is deferred until startup.';
   };
 
   const runTursoStartupPull = async (config: NormalizedSyncConfig): Promise<string | null> => {
@@ -365,12 +496,19 @@ export function createSyncService(ctx: SyncServiceContext): SyncService {
       return `Turso session setup pending: ${setup.message}`;
     }
 
-    const backend = createTursoSessionBackend({ locations, config, log });
-    const pullResult = await backend.pull();
-    if (pullResult.status !== 'skipped') {
-      await updateState(locations, { lastSessionPull: new Date().toISOString() });
+    queueTursoSync('startup');
+    const result = await flushQueuedTursoSync('startup', config);
+    if (result.deferred) {
+      scheduleTursoIdleFlush();
+      return 'Turso startup sync deferred until all sessions are idle.';
     }
-    return `Turso startup pull: ${pullResult.status}`;
+    if (result.warning) {
+      return result.warning;
+    }
+    if (result.summary) {
+      return `Turso startup sync: ${result.summary}`;
+    }
+    return null;
   };
 
   const ensureTursoSyncLoop = (config: NormalizedSyncConfig): void => {
@@ -394,16 +532,64 @@ export function createSyncService(ctx: SyncServiceContext): SyncService {
           return;
         }
 
-        try {
-          await runTursoCycleWithRetry(latest, 'background');
-        } catch (error) {
-          log.warn('Background Turso session sync failed', { error: formatError(error) });
+        queueTursoSync('background');
+        const result = await flushQueuedTursoSync('background', latest);
+        if (result.deferred) {
+          return;
+        }
+        if (result.warning) {
+          log.warn(result.warning, { reason: 'background' });
         }
       });
     }, nextInterval * 1000);
   };
 
+  const onEvent = async (event: unknown): Promise<void> => {
+    if (!isRecord(event)) {
+      return;
+    }
+
+    const eventType = typeof event.type === 'string' ? event.type : '';
+    const properties = isRecord(event.properties) ? event.properties : null;
+    if (!properties) {
+      return;
+    }
+
+    let idleSignal = false;
+    if (eventType === 'session.status') {
+      const sessionId = typeof properties.sessionID === 'string' ? properties.sessionID : null;
+      const status = isRecord(properties.status) ? properties.status : null;
+      const statusType = status && typeof status.type === 'string' ? status.type : null;
+      if (sessionId && statusType === 'idle') {
+        activeSessionIds.delete(sessionId);
+        idleSignal = true;
+      } else if (sessionId) {
+        activeSessionIds.add(sessionId);
+      }
+    } else if (eventType === 'session.idle') {
+      const sessionId = typeof properties.sessionID === 'string' ? properties.sessionID : null;
+      if (sessionId) {
+        activeSessionIds.delete(sessionId);
+        idleSignal = true;
+      }
+    } else if (eventType === 'session.deleted') {
+      const info = isRecord(properties.info) ? properties.info : null;
+      const sessionId = info && typeof info.id === 'string' ? info.id : null;
+      if (sessionId) {
+        activeSessionIds.delete(sessionId);
+        idleSignal = true;
+      }
+    }
+
+    if (idleSignal && pendingTursoSyncReasons.size > 0) {
+      scheduleTursoIdleFlush();
+    }
+  };
+
   return {
+    handleEvent: async (event: unknown) => {
+      await onEvent(event);
+    },
     startupSync: () =>
       skipIfBusy(async () => {
         let config: ReturnType<typeof normalizeSyncConfig> | null = null;
@@ -570,7 +756,9 @@ export function createSyncService(ctx: SyncServiceContext): SyncService {
         }
 
         if (isTursoSessionBackend(config) && options.migrateSessions) {
-          const cycle = await runTursoCycleWithRetry(config, 'init-migrate');
+          const cycle = await runTursoCycleWithRetry(config, 'init-migrate', {
+            preference: 'push',
+          });
           initNotes.push(`Session bootstrap: ${cycle.summary}`);
         }
 
@@ -606,23 +794,49 @@ export function createSyncService(ctx: SyncServiceContext): SyncService {
       }),
     link: (options: LinkOptions) =>
       runExclusive(async () => {
-        const found = await findSyncRepo(ctx.$, options.repo);
+        if (disableAutoRepoDiscovery && !options.repo) {
+          const expectation = strictLinkRepo
+            ? ` Provide the exact repo: ${strictLinkRepo.owner}/${strictLinkRepo.name}.`
+            : '';
+          throw new SyncCommandError(
+            'Repo auto-discovery is disabled in this environment. ' +
+              'Run /sync-link with an explicit repo argument.' +
+              expectation
+          );
+        }
+
+        const found = await findSyncRepo(ctx.$, options.repo, {
+          disableAutoDiscovery: disableAutoRepoDiscovery,
+        });
 
         if (!found) {
           const searchedFor = options.repo
             ? `"${options.repo}"`
-            : 'common sync repo names (my-opencode-config, opencode-config, etc.)';
+            : disableAutoRepoDiscovery
+              ? '(none; auto-discovery disabled)'
+              : 'common sync repo names (my-opencode-config, opencode-config, etc.)';
 
           const lines = [
             `Could not find an existing sync repo. Searched for: ${searchedFor}`,
             '',
             'To link to an existing repo, run:',
-            '  /sync-link <repo-name>',
+            '  /sync-link <owner/repo>',
             '',
             'To create a new sync repo, run:',
             '  /sync-init',
           ];
           return lines.join('\n');
+        }
+
+        if (strictLinkRepo) {
+          const linkedIdentifier = `${found.owner}/${found.name}`.toLowerCase();
+          const expectedIdentifier = `${strictLinkRepo.owner}/${strictLinkRepo.name}`.toLowerCase();
+          if (linkedIdentifier !== expectedIdentifier) {
+            throw new SyncCommandError(
+              `Strict link mode expected repo ${strictLinkRepo.owner}/${strictLinkRepo.name}, ` +
+                `but resolved ${found.owner}/${found.name}.`
+            );
+          }
         }
 
         const config = normalizeSyncConfig({
@@ -898,7 +1112,9 @@ export function createSyncService(ctx: SyncServiceContext): SyncService {
           }
 
           if (options.migrateSessions) {
-            const cycle = await runTursoCycleWithRetry(nextConfig, 'sessions-backend-migrate');
+            const cycle = await runTursoCycleWithRetry(nextConfig, 'sessions-backend-migrate', {
+              preference: 'push',
+            });
             notes.push(`Session bootstrap: ${cycle.summary}`);
           }
         }
@@ -993,7 +1209,9 @@ export function createSyncService(ctx: SyncServiceContext): SyncService {
           }
         }
 
-        const cycle = await runTursoCycleWithRetry(migratedConfig, 'sessions-migrate-turso');
+        const cycle = await runTursoCycleWithRetry(migratedConfig, 'sessions-migrate-turso', {
+          preference: 'push',
+        });
         await writeSyncConfig(locations, migratedConfig);
         ensureTursoSyncLoop(migratedConfig);
 
@@ -1286,6 +1504,24 @@ function formatError(error: unknown): string {
   return String(error);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isBusySessionStatus(status: unknown): boolean {
+  if (!isRecord(status)) {
+    return true;
+  }
+  const statusType = typeof status.type === 'string' ? status.type : '';
+  if (statusType === 'idle') {
+    return false;
+  }
+  if (statusType === 'busy' || statusType === 'retry') {
+    return true;
+  }
+  return true;
+}
+
 interface ResolutionDecision {
   action: 'commit' | 'reset' | 'manual';
   message?: string;
@@ -1389,4 +1625,19 @@ function parseResolutionDecision(text: string): ResolutionDecision {
   } catch {
     return { action: 'manual', reason: 'Failed to parse AI decision' };
   }
+}
+
+function resolveStrictLinkRepo(raw: string | undefined): { owner: string; name: string } | null {
+  if (!raw) return null;
+  const value = raw.trim();
+  if (!value) return null;
+
+  const parsed = parseRepoReference(value, '__opencode_sync_no_owner__');
+  if (!parsed || parsed.owner === '__opencode_sync_no_owner__') {
+    throw new SyncCommandError(
+      'OPENCODE_SYNC_E2E_STRICT_LINK_REPO must be an explicit owner/repo or GitHub repo URL.'
+    );
+  }
+
+  return parsed;
 }

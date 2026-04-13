@@ -49,6 +49,10 @@ interface TursoSessionCredential {
   machineId: string;
   createdAt: string;
   updatedAt: string;
+  syncState?: {
+    lastKnownSnapshotSha?: string;
+    updatedAt?: string;
+  };
 }
 
 interface TursoCommandResult {
@@ -85,6 +89,8 @@ export interface TursoSessionSyncCycleResult {
   pullAfter: TursoSessionSyncResult;
 }
 
+export type TursoSyncPreference = 'auto' | 'pull' | 'push';
+
 export interface TursoSessionSetupOptions {
   allowLogin?: boolean;
   allowAutoInstall?: boolean;
@@ -96,7 +102,10 @@ export interface TursoSessionBackend {
   status: () => Promise<string>;
   pull: () => Promise<TursoSessionSyncResult>;
   push: () => Promise<TursoSessionSyncResult>;
-  syncCycle: () => Promise<TursoSessionSyncCycleResult>;
+  syncCycle: (_options?: {
+    preference?: TursoSyncPreference;
+    allowLocalPull?: boolean;
+  }) => Promise<TursoSessionSyncCycleResult>;
 }
 
 export function createTursoSessionBackend(options: {
@@ -185,6 +194,7 @@ export function createTursoSessionBackend(options: {
       machineId: resolveMachineId(),
       createdAt: existing?.createdAt ?? new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      syncState: existing?.syncState,
     };
 
     if (!(await isCredentialUsable(credential))) {
@@ -201,7 +211,7 @@ export function createTursoSessionBackend(options: {
       }
     }
 
-    await writeJsonFile(credentialPath, credential, { jsonc: false, mode: 0o600 });
+    await writeCredential(credentialPath, credential);
 
     return {
       ready: true,
@@ -223,11 +233,68 @@ export function createTursoSessionBackend(options: {
     return credential;
   };
 
+  const writeKnownSha = async (
+    credential: TursoSessionCredential,
+    nextSha: string | null
+  ): Promise<void> => {
+    if (!nextSha) return;
+    if (credential.syncState?.lastKnownSnapshotSha === nextSha) {
+      return;
+    }
+
+    const updated: TursoSessionCredential = {
+      ...credential,
+      syncState: {
+        ...credential.syncState,
+        lastKnownSnapshotSha: nextSha,
+        updatedAt: new Date().toISOString(),
+      },
+      updatedAt: new Date().toISOString(),
+    };
+    await writeCredential(credentialPath, updated);
+  };
+
+  const applyPull = async (
+    credential: TursoSessionCredential,
+    remoteSnapshot: {
+      db: Buffer;
+      wal: Buffer | null;
+      shm: Buffer | null;
+      sha256: string;
+      machineId: string;
+      updatedAt: string;
+    }
+  ): Promise<TursoSessionSyncResult> => {
+    await writeLocalSessionSnapshot(paths, remoteSnapshot);
+    await writeKnownSha(credential, remoteSnapshot.sha256);
+    return {
+      status: 'synced',
+      sha256: remoteSnapshot.sha256,
+      message: `Pulled sessions from Turso snapshot (${remoteSnapshot.machineId}).`,
+    };
+  };
+
+  const applyPush = async (
+    credential: TursoSessionCredential,
+    localSnapshot: SessionSnapshot
+  ): Promise<TursoSessionSyncResult> => {
+    await upsertRemoteSnapshot(credential, localSnapshot, resolveMachineId());
+    await writeKnownSha(credential, localSnapshot.sha256);
+    return {
+      status: 'synced',
+      sha256: localSnapshot.sha256,
+      message: 'Pushed local sessions to Turso.',
+    };
+  };
+
   const pull = async (): Promise<TursoSessionSyncResult> => {
     const credential = await requireCredential();
     await ensureSnapshotTable(credential);
 
-    const remoteSnapshot = await fetchRemoteSnapshot(credential);
+    const [remoteSnapshot, localSnapshot] = await Promise.all([
+      fetchRemoteSnapshot(credential),
+      readLocalSessionSnapshot(paths),
+    ]);
     if (!remoteSnapshot) {
       return {
         status: 'skipped',
@@ -235,7 +302,6 @@ export function createTursoSessionBackend(options: {
       };
     }
 
-    const localSnapshot = await readLocalSessionSnapshot(paths);
     if (localSnapshot && localSnapshot.sha256 === remoteSnapshot.sha256) {
       return {
         status: 'unchanged',
@@ -244,12 +310,7 @@ export function createTursoSessionBackend(options: {
       };
     }
 
-    await writeLocalSessionSnapshot(paths, remoteSnapshot);
-    return {
-      status: 'synced',
-      sha256: remoteSnapshot.sha256,
-      message: `Pulled sessions from Turso snapshot (${remoteSnapshot.machineId}).`,
-    };
+    return await applyPull(credential, remoteSnapshot);
   };
 
   const push = async (): Promise<TursoSessionSyncResult> => {
@@ -273,12 +334,7 @@ export function createTursoSessionBackend(options: {
       };
     }
 
-    await upsertRemoteSnapshot(credential, localSnapshot, resolveMachineId());
-    return {
-      status: 'synced',
-      sha256: localSnapshot.sha256,
-      message: 'Pushed local sessions to Turso.',
-    };
+    return await applyPush(credential, localSnapshot);
   };
 
   const status = async (): Promise<string> => {
@@ -295,14 +351,189 @@ export function createTursoSessionBackend(options: {
     return `Turso backend ready (${credential.database}); concurrent-safe backend enabled.`;
   };
 
-  const syncCycle = async (): Promise<TursoSessionSyncCycleResult> => {
-    const pullBefore = await pull();
-    const pushResult = await push();
-    const pullAfter = await pull();
+  const syncCycle = async (
+    options: { preference?: TursoSyncPreference; allowLocalPull?: boolean } = {}
+  ): Promise<TursoSessionSyncCycleResult> => {
+    const preference = options.preference ?? 'auto';
+    const allowLocalPull = options.allowLocalPull ?? true;
+    const credential = await requireCredential();
+    await ensureSnapshotTable(credential);
+
+    const [remoteSnapshot, localSnapshot] = await Promise.all([
+      fetchRemoteSnapshot(credential),
+      readLocalSessionSnapshot(paths),
+    ]);
+    const knownSha = credential.syncState?.lastKnownSnapshotSha?.trim() || null;
+    const pullBefore: TursoSessionSyncResult = {
+      status: 'skipped',
+      message: 'No pull required.',
+    };
+    const pushResult: TursoSessionSyncResult = {
+      status: 'skipped',
+      message: 'No push required.',
+    };
+    const pullAfter: TursoSessionSyncResult = {
+      status: 'skipped',
+      message: 'No final pull required.',
+    };
+    const localPullDeferredMessage =
+      'Remote session snapshot available, but local apply is deferred until startup to avoid live SQLite replacement.';
+
+    if (!localSnapshot && !remoteSnapshot) {
+      pullBefore.message = `Local session database not found at ${paths.dbPath}.`;
+      pushResult.message = 'No remote session snapshot found in Turso yet.';
+      pullAfter.message = 'No final pull required.';
+      return { pullBefore, push: pushResult, pullAfter };
+    }
+
+    if (localSnapshot && remoteSnapshot && localSnapshot.sha256 === remoteSnapshot.sha256) {
+      await writeKnownSha(credential, localSnapshot.sha256);
+      pullBefore.status = 'unchanged';
+      pullBefore.sha256 = localSnapshot.sha256;
+      pullBefore.message = 'Local and remote session snapshots already match.';
+      pushResult.status = 'unchanged';
+      pushResult.sha256 = localSnapshot.sha256;
+      pushResult.message = 'No session changes to push.';
+      pullAfter.status = 'unchanged';
+      pullAfter.sha256 = localSnapshot.sha256;
+      pullAfter.message = 'No session changes to pull.';
+      return { pullBefore, push: pushResult, pullAfter };
+    }
+
+    const localSha = localSnapshot?.sha256 ?? null;
+    const remoteSha = remoteSnapshot?.sha256 ?? null;
+    const localChanged = knownSha ? localSha !== knownSha : localSnapshot !== null;
+    const remoteChanged = knownSha
+      ? remoteSha !== null && remoteSha !== knownSha
+      : remoteSnapshot !== null;
+
+    const shouldPreferPush =
+      preference === 'push' ||
+      (preference === 'auto' && knownSha !== null && localChanged && !remoteChanged);
+    const shouldPreferPull =
+      preference === 'pull' ||
+      (preference === 'auto' && knownSha !== null && !localChanged && remoteChanged);
+
+    if (!knownSha) {
+      if (remoteSnapshot && (shouldPreferPull || !localSnapshot)) {
+        if (!allowLocalPull) {
+          pullBefore.status = 'skipped';
+          pullBefore.sha256 = remoteSnapshot.sha256;
+          pullBefore.message = localPullDeferredMessage;
+          pushResult.status = 'skipped';
+          pushResult.message =
+            'Skipped push because remote snapshot is newer and runtime local pull is disabled.';
+          return { pullBefore, push: pushResult, pullAfter };
+        }
+
+        const pulled = await applyPull(credential, remoteSnapshot);
+        pullBefore.status = pulled.status;
+        pullBefore.sha256 = pulled.sha256;
+        pullBefore.message = pulled.message;
+        pushResult.status = 'skipped';
+        pushResult.message = 'Skipped push after pull-preferred bootstrap.';
+        pullAfter.status = 'unchanged';
+        pullAfter.sha256 = pulled.sha256;
+        pullAfter.message = 'No final pull required.';
+        return { pullBefore, push: pushResult, pullAfter };
+      }
+
+      if (localSnapshot) {
+        const pushed = await applyPush(credential, localSnapshot);
+        pushResult.status = pushed.status;
+        pushResult.sha256 = pushed.sha256;
+        pushResult.message = pushed.message;
+        pullBefore.status = 'skipped';
+        pullBefore.message = 'Skipped initial pull during push-preferred bootstrap.';
+        pullAfter.status = 'skipped';
+        pullAfter.message = 'Skipped final pull during push-preferred bootstrap.';
+        return { pullBefore, push: pushResult, pullAfter };
+      }
+    }
+
+    if (localChanged && !remoteChanged && localSnapshot) {
+      const pushed = await applyPush(credential, localSnapshot);
+      pushResult.status = pushed.status;
+      pushResult.sha256 = pushed.sha256;
+      pushResult.message = pushed.message;
+      return { pullBefore, push: pushResult, pullAfter };
+    }
+
+    if (!localChanged && remoteChanged && remoteSnapshot) {
+      if (!allowLocalPull) {
+        pullBefore.status = 'skipped';
+        pullBefore.sha256 = remoteSnapshot.sha256;
+        pullBefore.message = localPullDeferredMessage;
+        return { pullBefore, push: pushResult, pullAfter };
+      }
+
+      const pulled = await applyPull(credential, remoteSnapshot);
+      pullBefore.status = pulled.status;
+      pullBefore.sha256 = pulled.sha256;
+      pullBefore.message = pulled.message;
+      return { pullBefore, push: pushResult, pullAfter };
+    }
+
+    if (localChanged && remoteChanged) {
+      if (shouldPreferPull && remoteSnapshot) {
+        if (!allowLocalPull) {
+          pullBefore.status = 'skipped';
+          pullBefore.sha256 = remoteSnapshot.sha256;
+          pullBefore.message = `${localPullDeferredMessage} (conflict deferred by pull preference)`;
+          return { pullBefore, push: pushResult, pullAfter };
+        }
+
+        const pulled = await applyPull(credential, remoteSnapshot);
+        pullBefore.status = pulled.status;
+        pullBefore.sha256 = pulled.sha256;
+        pullBefore.message = `${pulled.message} (resolved by pull preference)`;
+        return { pullBefore, push: pushResult, pullAfter };
+      }
+
+      if (shouldPreferPush && localSnapshot) {
+        const pushed = await applyPush(credential, localSnapshot);
+        pushResult.status = pushed.status;
+        pushResult.sha256 = pushed.sha256;
+        pushResult.message = `${pushed.message} (resolved by push preference)`;
+        return { pullBefore, push: pushResult, pullAfter };
+      }
+
+      if (localSnapshot) {
+        const pushed = await applyPush(credential, localSnapshot);
+        pushResult.status = pushed.status;
+        pushResult.sha256 = pushed.sha256;
+        pushResult.message = `${pushed.message} (resolved by auto preference)`;
+        return { pullBefore, push: pushResult, pullAfter };
+      }
+    }
+
+    if (remoteSnapshot && !localSnapshot) {
+      if (!allowLocalPull) {
+        pullBefore.status = 'skipped';
+        pullBefore.sha256 = remoteSnapshot.sha256;
+        pullBefore.message = localPullDeferredMessage;
+        return { pullBefore, push: pushResult, pullAfter };
+      }
+
+      const pulled = await applyPull(credential, remoteSnapshot);
+      pullBefore.status = pulled.status;
+      pullBefore.sha256 = pulled.sha256;
+      pullBefore.message = pulled.message;
+      return { pullBefore, push: pushResult, pullAfter };
+    }
+
+    pullBefore.status = 'unchanged';
+    pullBefore.sha256 = localSha ?? remoteSha ?? undefined;
+    pullBefore.message = 'No Turso session changes detected.';
     log.debug('Completed Turso session sync cycle', {
       pullBefore: pullBefore.status,
       push: pushResult.status,
       pullAfter: pullAfter.status,
+      preference,
+      allowLocalPull,
+      knownSha,
+      localSha,
+      remoteSha,
     });
     return {
       pullBefore,
@@ -416,6 +647,16 @@ async function readTursoCredential(filePath: string): Promise<TursoSessionCreden
       return null;
     }
 
+    const syncStateInput = isPlainObject(credential.syncState) ? credential.syncState : null;
+    const lastKnownSnapshotSha =
+      syncStateInput && typeof syncStateInput.lastKnownSnapshotSha === 'string'
+        ? syncStateInput.lastKnownSnapshotSha
+        : undefined;
+    const syncUpdatedAt =
+      syncStateInput && typeof syncStateInput.updatedAt === 'string'
+        ? syncStateInput.updatedAt
+        : undefined;
+
     return {
       version: Number(credential.version ?? CREDENTIAL_VERSION),
       database: credential.database,
@@ -425,10 +666,25 @@ async function readTursoCredential(filePath: string): Promise<TursoSessionCreden
       machineId: credential.machineId,
       createdAt: typeof credential.createdAt === 'string' ? credential.createdAt : '',
       updatedAt: typeof credential.updatedAt === 'string' ? credential.updatedAt : '',
+      syncState:
+        lastKnownSnapshotSha || syncUpdatedAt
+          ? {
+              lastKnownSnapshotSha,
+              updatedAt: syncUpdatedAt,
+            }
+          : undefined,
     };
   } catch {
     return null;
   }
+}
+
+async function writeCredential(
+  filePath: string,
+  credential: TursoSessionCredential
+): Promise<void> {
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await writeJsonFile(filePath, credential, { jsonc: false, mode: 0o600 });
 }
 
 async function isCredentialUsable(credential: TursoSessionCredential): Promise<boolean> {
@@ -945,18 +1201,47 @@ async function executeSql(
 
   for (const result of parsed.results) {
     if (!isPlainObject(result)) continue;
-    const resultError = result.error;
+    const resultError = extractSqlError(result);
     if (resultError) {
-      throw new SyncCommandError(`Turso SQL error: ${String(resultError)}`);
+      throw new SyncCommandError(`Turso SQL error: ${resultError}`);
     }
   }
 
   return parsed.results;
 }
 
-function extractRows(result: unknown): unknown[] {
+function extractSqlError(result: Record<string, unknown>): string | null {
+  if (result.error) {
+    return String(result.error);
+  }
+
+  const response = isPlainObject(result.response) ? result.response : null;
+  if (!response) return null;
+
+  if (response.error) {
+    return String(response.error);
+  }
+
+  return null;
+}
+
+export function extractRows(result: unknown): unknown[] {
   if (!isPlainObject(result)) return [];
   if (Array.isArray(result.rows)) return result.rows;
+
+  const resultNode = isPlainObject(result.result) ? result.result : null;
+  if (resultNode && Array.isArray(resultNode.rows)) return resultNode.rows;
+
+  const responseNode = isPlainObject(result.response) ? result.response : null;
+  if (!responseNode) return [];
+
+  if (Array.isArray(responseNode.rows)) return responseNode.rows;
+
+  const responseResultNode = isPlainObject(responseNode.result) ? responseNode.result : null;
+  if (responseResultNode && Array.isArray(responseResultNode.rows)) {
+    return responseResultNode.rows;
+  }
+
   return [];
 }
 
