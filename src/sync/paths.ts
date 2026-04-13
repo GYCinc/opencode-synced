@@ -51,7 +51,7 @@ const DEFAULT_SYNC_CONFIG_NAME = 'opencode-synced.jsonc';
 const DEFAULT_OVERRIDES_NAME = 'opencode-synced.overrides.jsonc';
 const DEFAULT_STATE_NAME = 'sync-state.json';
 
-const CONFIG_DIRS = ['agent', 'command', 'mode', 'tool', 'themes', 'plugin'];
+const CONFIG_DIRS = ['agent', 'command', 'mode', 'tool', 'themes', 'plugin', 'skills'];
 const SESSION_DIRS = ['storage/session', 'storage/message', 'storage/part', 'storage/session_diff'];
 const PROMPT_STASH_FILES = ['prompt-stash.jsonl', 'prompt-history.jsonl'];
 const MODEL_FAVORITES_FILE = 'model.json';
@@ -287,7 +287,9 @@ export function buildSyncPlan(
   );
 
   const extraConfigPaths = (config.extraConfigPaths ?? []).filter(
-    (entry) => !isSamePath(entry, locations.syncConfigPath, locations.xdg.homeDir, platform)
+    (entry) =>
+      !isSamePath(entry, locations.syncConfigPath, locations.xdg.homeDir, platform) &&
+      !isSamePath(entry, path.join(configRoot, 'skills'), locations.xdg.homeDir, platform)
   );
 
   const extraConfigs = buildExtraPathPlan(

@@ -87,6 +87,52 @@ describe('buildSyncPlan', () => {
     expect(plan.extraConfigs.allowlist.length).toBe(0);
   });
 
+  it('includes skills directory in default sync items', () => {
+    const env = { HOME: '/home/test' } as NodeJS.ProcessEnv;
+    const locations = resolveSyncLocations(env, 'linux');
+    const config: SyncConfig = {
+      repo: { owner: 'acme', name: 'config' },
+      includeSecrets: false,
+    };
+
+    const plan = buildSyncPlan(normalizeSyncConfig(config), locations, '/repo', 'linux');
+    const skillsItem = plan.items.find((item) =>
+      item.localPath.endsWith('/.config/opencode/skills')
+    );
+
+    expect(skillsItem).toBeTruthy();
+    expect(skillsItem?.type).toBe('dir');
+  });
+
+  it('filters skills path from extra config paths', () => {
+    const env = { HOME: '/home/test' } as NodeJS.ProcessEnv;
+    const locations = resolveSyncLocations(env, 'linux');
+    const config: SyncConfig = {
+      repo: { owner: 'acme', name: 'config' },
+      includeSecrets: false,
+      extraConfigPaths: [`${locations.configRoot}/skills`],
+    };
+
+    const plan = buildSyncPlan(normalizeSyncConfig(config), locations, '/repo', 'linux');
+
+    expect(plan.extraConfigs.allowlist.length).toBe(0);
+  });
+
+  it('keeps non-default extra config paths when skills is also listed', () => {
+    const env = { HOME: '/home/test' } as NodeJS.ProcessEnv;
+    const locations = resolveSyncLocations(env, 'linux');
+    const customConfigPath = `${locations.configRoot}/custom.json`;
+    const config: SyncConfig = {
+      repo: { owner: 'acme', name: 'config' },
+      includeSecrets: false,
+      extraConfigPaths: [`${locations.configRoot}/skills`, customConfigPath],
+    };
+
+    const plan = buildSyncPlan(normalizeSyncConfig(config), locations, '/repo', 'linux');
+
+    expect(plan.extraConfigs.allowlist).toEqual([customConfigPath]);
+  });
+
   it('includes secrets when includeSecrets is true', () => {
     const env = { HOME: '/home/test' } as NodeJS.ProcessEnv;
     const locations = resolveSyncLocations(env, 'linux');

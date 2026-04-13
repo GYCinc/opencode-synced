@@ -88,9 +88,9 @@ Create `~/.config/opencode/opencode-synced.jsonc`:
 
 - `~/.config/opencode/opencode.json` and `opencode.jsonc`
 - `~/.config/opencode/AGENTS.md`
-- `~/.config/opencode/agent/`, `command/`, `mode/`, `tool/`, `themes/`, `plugin/`
+- `~/.config/opencode/agent/`, `command/`, `mode/`, `tool/`, `themes/`, `plugin/`, `skills/`
 - `~/.local/state/opencode/model.json` (model favorites)
-- Any extra paths in `extraConfigPaths` (allowlist, files or folders)
+- Any additional paths in `extraConfigPaths` (allowlist, files or folders). You do not need to include default paths like `~/.config/opencode/skills`.
 
 ### Secrets (private repos only)
 
