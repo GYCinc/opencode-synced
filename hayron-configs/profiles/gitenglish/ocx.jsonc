@@ -24,7 +24,6 @@
   "exclude": [
     "**/.env",
     "**/.env.*",
-    "**/.secrets*",
     "**/railway.toml",
     "**/railpack.json",
     "**/*.db",

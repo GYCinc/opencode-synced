@@ -12,7 +12,6 @@
   "exclude": [
     "**/.env",
     "**/.env.*",
-    "**/.secrets*",
     "**/opencode.json",
     "**/opencode.jsonc",
     "**/ocx.jsonc",
