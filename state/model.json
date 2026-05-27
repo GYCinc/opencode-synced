@@ -1,0 +1,42 @@
+{
+  "recent": [
+    {
+      "providerID": "deepseek",
+      "modelID": "deepseek-v4-pro"
+    },
+    {
+      "providerID": "opencode",
+      "modelID": "deepseek-v4-flash-free"
+    },
+    {
+      "providerID": "deepseek",
+      "modelID": "deepseek-v4-flash"
+    },
+    {
+      "providerID": "opencode",
+      "modelID": "qwen3.6-plus-free"
+    },
+    {
+      "providerID": "opencode",
+      "modelID": "big-pickle"
+    },
+    {
+      "providerID": "openrouter",
+      "modelID": "google/gemma-4-31b-it:free"
+    },
+    {
+      "providerID": "openrouter",
+      "modelID": "qwen/qwen3-coder"
+    }
+  ],
+  "favorite": [],
+  "variant": {
+    "deepseek/deepseek-v4-pro": "default",
+    "openrouter/google/gemma-4-31b-it:free": "default",
+    "opencode/big-pickle": "default",
+    "opencode/qwen3.6-plus-free": "default",
+    "deepseek/deepseek-v4-flash": "max",
+    "mistral/pixtral-large-latest": "default",
+    "opencode/deepseek-v4-flash-free": "max"
+  }
+}
