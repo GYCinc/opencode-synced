@@ -6,6 +6,7 @@
   "include": [
     "By Student/**",
     ".config/opencode/profiles/students/**",
+    ".config/opencode/agents/**",
     "Documents/**"
   ],
 

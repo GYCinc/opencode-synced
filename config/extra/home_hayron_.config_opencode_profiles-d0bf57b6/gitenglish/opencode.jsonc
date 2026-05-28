@@ -10,7 +10,7 @@
         "bash": {
           "*": "ask",
           "rm -rf /*": "deny",
-          "run0 *": "allow",
+          "run0 *": "allow"
         },
         "edit": {
           "**/*.env*": "deny",
@@ -20,9 +20,9 @@
           "**/railpack.json": "deny",
           "**/*.db": "deny",
           "node_modules/**": "deny",
-          ".git/**": "deny",
-        },
-      },
+          ".git/**": "deny"
+        }
+      }
     },
     "opencoder": {
       "mode": "subagent",
@@ -35,15 +35,15 @@
         "bash": {
           "*": "ask",
           "rm -rf /*": "deny",
-          "sudo *": "deny",
+          "sudo *": "deny"
         },
         "edit": {
           "**/*.env*": "deny",
           "**/.secrets*": "deny",
           "node_modules/**": "deny",
-          ".git/**": "deny",
-        },
-      },
+          ".git/**": "deny"
+        }
+      }
     },
     "ContextScout": {
       "mode": "subagent",
@@ -51,7 +51,7 @@
       "temperature": 0.6,
       "steps": 50,
       "hidden": true,
-      "color": "#4CAF50",
+      "color": "#4CAF50"
     },
     "ExternalScout": {
       "mode": "subagent",
@@ -59,7 +59,7 @@
       "temperature": 0.6,
       "steps": 50,
       "hidden": true,
-      "color": "#8BC34A",
+      "color": "#8BC34A"
     },
     "TaskManager": {
       "mode": "subagent",
@@ -67,7 +67,7 @@
       "temperature": 0.5,
       "steps": 50,
       "hidden": true,
-      "color": "#FF9800",
+      "color": "#FF9800"
     },
     "DocWriter": {
       "mode": "subagent",
@@ -75,7 +75,7 @@
       "temperature": 0.8,
       "steps": 50,
       "hidden": true,
-      "color": "#9C27B0",
+      "color": "#9C27B0"
     },
     "CoderAgent": {
       "mode": "subagent",
@@ -83,7 +83,7 @@
       "temperature": 0.7,
       "steps": 50,
       "hidden": true,
-      "color": "#2196F3",
+      "color": "#2196F3"
     },
     "CodeReviewer": {
       "mode": "subagent",
@@ -91,7 +91,7 @@
       "temperature": 0.5,
       "steps": 50,
       "hidden": true,
-      "color": "#607D8B",
+      "color": "#607D8B"
     },
     "TestEngineer": {
       "mode": "subagent",
@@ -99,7 +99,7 @@
       "temperature": 0.7,
       "steps": 50,
       "hidden": false,
-      "color": "#F44336",
+      "color": "#F44336"
     },
     "BuildAgent": {
       "mode": "subagent",
@@ -107,7 +107,7 @@
       "temperature": 0.7,
       "steps": 10,
       "hidden": false,
-      "color": "#795548",
+      "color": "#795548"
     },
     "OpenFrontendSpecialist": {
       "mode": "subagent",
@@ -115,7 +115,7 @@
       "temperature": 0.7,
       "steps": 15,
       "hidden": false,
-      "color": "#E91E63",
+      "color": "#E91E63"
     },
     "OpenDevopsSpecialist": {
       "mode": "subagent",
@@ -123,7 +123,7 @@
       "temperature": 0.5,
       "steps": 50,
       "hidden": false,
-      "color": "#00BCD4",
+      "color": "#00BCD4"
     },
     "ContextOrganizer": {
       "mode": "subagent",
@@ -131,7 +131,7 @@
       "temperature": 0.7,
       "steps": 50,
       "hidden": true,
-      "color": "#3F51B5",
-    },
-  },
+      "color": "#3F51B5"
+    }
+  }
 }

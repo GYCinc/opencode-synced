@@ -1,6 +1,10 @@
 {
   "recent": [
     {
+      "providerID": "openrouter",
+      "modelID": "qwen/qwen3-next-80b-a3b-instruct:free"
+    },
+    {
       "providerID": "kilo",
       "modelID": "ai21/jamba-large-1.7"
     },

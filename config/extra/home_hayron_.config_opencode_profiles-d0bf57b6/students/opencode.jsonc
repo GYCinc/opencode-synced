@@ -3,114 +3,82 @@
     "airon-et": {
       "mode": "primary",
       "model": "deepseek/deepseek-v4-pro",
-      "temperature": 1.0,
+      "temperature": 0.8,
+      "reasoningEffort": "high",
       "steps": 33,
       "color": "#00E5FF",
       "permission": {
-        "skill": {
-          "*": "deny",
-          "airon-*": "allow"
-        },
-        "task": {
-          "*": "deny",
-          "airon-*": "allow"
-        }
+        "skill": { "*": "deny", "airon-*": "allow" },
+        "task": { "*": "deny", "airon-*": "allow" }
       }
     },
     "airon-context-management": {
       "mode": "subagent",
-      "model": "deepseek/deepseek-reasoner",
-      "temperature": 0.3,
+      "model": "deepseek/deepseek-v4-pro",
+      "temperature": 0.7,
+      "reasoningEffort": "medium",
       "steps": 20,
       "hidden": true,
       "color": "#7C4DFF",
       "permission": {
         "bash": "deny",
-        "edit": {
-          "*": "deny",
-          "*/student_context.toml": "allow"
-        },
-        "skill": {
-          "*": "deny",
-          "airon-context-management": "allow"
-        }
+        "edit": { "*": "deny", "*/student_context.toml": "allow" },
+        "skill": { "*": "deny", "airon-context-management": "allow" }
       }
     },
     "airon-task-design": {
       "mode": "subagent",
-      "model": "deepseek/deepseek-v4-pro",
-      "temperature": 1.0,
+      "model": "deepseek/deepseek-v4-flash",
+      "temperature": 1.1,
+      "reasoningEffort": "high",
       "steps": 20,
       "hidden": true,
       "color": "#FF6D00",
       "permission": {
         "bash": "deny",
         "edit": "deny",
-        "skill": {
-          "*": "deny",
-          "airon-task-design": "allow"
-        }
+        "skill": { "*": "deny", "airon-task-design": "allow" }
       }
     },
     "airon-report-generation": {
       "mode": "subagent",
       "model": "deepseek/deepseek-reasoner",
-      "temperature": 0.7,
+      "temperature": 1.0,
       "steps": 20,
       "hidden": true,
       "color": "#00E676",
       "permission": {
         "bash": "deny",
-        "edit": {
-          "*": "deny",
-          "*.html": "allow",
-          "*.md": "allow"
-        },
-        "skill": {
-          "*": "deny",
-          "airon-report-generation": "allow"
-        }
+        "edit": { "*": "deny", "*.html": "allow", "*.md": "allow" },
+        "skill": { "*": "deny", "airon-report-generation": "allow" }
       }
     },
     "airon-sanitization": {
       "mode": "subagent",
       "model": "deepseek/deepseek-v4-flash",
       "temperature": 0.3,
+      "reasoningEffort": "medium",
       "steps": 10,
       "hidden": true,
       "color": "#FF4081",
       "permission": {
-        "bash": {
-          "*": "ask",
-          "rm *": "allow",
-          "rm -rf *": "allow",
-          "ls *": "allow",
-          "find *": "allow"
-        },
+        "bash": { "*": "ask", "rm *": "allow", "rm -rf *": "allow", "ls *": "allow", "find *": "allow" },
         "edit": "deny",
-        "skill": {
-          "*": "deny",
-          "airon-sanitization": "allow"
-        }
+        "skill": { "*": "deny", "airon-sanitization": "allow" }
       }
     },
     "airon-feedback-loop": {
       "mode": "subagent",
-      "model": "deepseek/deepseek-reasoner",
-      "temperature": 1.0,
+      "model": "deepseek/deepseek-v4-flash",
+      "temperature": 0.5,
+      "reasoningEffort": "high",
       "steps": 20,
       "hidden": true,
       "color": "#FFD600",
       "permission": {
         "bash": "deny",
-        "edit": {
-          "*": "deny",
-          "By Student/*/RULES.md": "allow"
-        },
-        "skill": {
-          "*": "deny",
-          "airon-feedback-loop": "allow"
-        }
+        "edit": { "*": "deny", "By Student/*/RULES.md": "allow" },
+        "skill": { "*": "deny", "airon-feedback-loop": "allow" }
       }
     }
   }
