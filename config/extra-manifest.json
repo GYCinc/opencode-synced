@@ -27,6 +27,21 @@
           "mode": 420
         },
         {
+          "relativePath": "students/skills",
+          "type": "dir",
+          "mode": 493
+        },
+        {
+          "relativePath": "students/skills/student-session-report",
+          "type": "dir",
+          "mode": 493
+        },
+        {
+          "relativePath": "students/skills/student-session-report/SKILL.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
           "relativePath": "gitenglish",
           "type": "dir",
           "mode": 448

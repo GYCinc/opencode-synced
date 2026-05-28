@@ -1,4 +1,12 @@
 {
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "lazy-mcp": {
+      "type": "local",
+      "command": ["lazy-mcp", "--config", "/home/hayron/.config/lazy-mcp/servers.json"],
+      "enabled": true
+    }
+  },
   "agent": {
     "openagent": {
       "mode": "primary",

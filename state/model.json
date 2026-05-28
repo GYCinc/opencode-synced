@@ -1,8 +1,20 @@
 {
   "recent": [
     {
+      "providerID": "deepseek",
+      "modelID": "deepseek-v4-pro"
+    },
+    {
+      "providerID": "openrouter",
+      "modelID": "deepseek/deepseek-v4-pro"
+    },
+    {
       "providerID": "kilo",
       "modelID": "moonshotai/kimi-k2.6"
+    },
+    {
+      "providerID": "openrouter",
+      "modelID": "google/gemini-3.5-flash"
     },
     {
       "providerID": "openrouter",
@@ -21,24 +33,12 @@
       "modelID": "ai21/jamba-large-1.7"
     },
     {
-      "providerID": "deepseek",
-      "modelID": "deepseek-v4-pro"
-    },
-    {
       "providerID": "opencode",
       "modelID": "deepseek-v4-flash-free"
     },
     {
       "providerID": "deepseek",
       "modelID": "deepseek-v4-flash"
-    },
-    {
-      "providerID": "opencode",
-      "modelID": "qwen3.6-plus-free"
-    },
-    {
-      "providerID": "opencode",
-      "modelID": "big-pickle"
     }
   ],
   "favorite": [],
@@ -50,6 +50,7 @@
     "deepseek/deepseek-v4-flash": "max",
     "mistral/pixtral-large-latest": "default",
     "opencode/deepseek-v4-flash-free": "max",
-    "kilo/anthropic/claude-opus-4.6-fast": "medium"
+    "kilo/anthropic/claude-opus-4.6-fast": "medium",
+    "openrouter/google/gemini-3.5-flash": "xhigh"
   }
 }

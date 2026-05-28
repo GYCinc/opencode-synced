@@ -1,11 +1,19 @@
 {
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "lazy-mcp": {
+      "type": "local",
+      "command": ["lazy-mcp", "--config", "/home/hayron/.config/lazy-mcp/servers.json"],
+      "enabled": true
+    }
+  },
   "agent": {
     "airon-et": {
       "mode": "primary",
       "model": "deepseek/deepseek-v4-pro",
-      "temperature": 0.8,
+      "temperature": 0.4,
       "reasoningEffort": "high",
-      "steps": 33,
+      "steps": 40,
       "color": "#00E5FF",
       "permission": {
         "skill": { "*": "deny", "airon-*": "allow" },
@@ -16,7 +24,7 @@
       "mode": "subagent",
       "model": "deepseek/deepseek-v4-pro",
       "temperature": 0.7,
-      "reasoningEffort": "medium",
+      "reasoningEffort": "high",
       "steps": 20,
       "hidden": true,
       "color": "#7C4DFF",
@@ -31,7 +39,7 @@
       "model": "deepseek/deepseek-v4-flash",
       "temperature": 1.1,
       "reasoningEffort": "high",
-      "steps": 20,
+      "steps": 25,
       "hidden": true,
       "color": "#FF6D00",
       "permission": {
@@ -57,8 +65,8 @@
       "mode": "subagent",
       "model": "deepseek/deepseek-v4-flash",
       "temperature": 0.3,
-      "reasoningEffort": "medium",
-      "steps": 10,
+      "reasoningEffort": "high",
+      "steps": 12,
       "hidden": true,
       "color": "#FF4081",
       "permission": {
@@ -72,7 +80,7 @@
       "model": "deepseek/deepseek-v4-flash",
       "temperature": 0.5,
       "reasoningEffort": "high",
-      "steps": 20,
+      "steps": 25,
       "hidden": true,
       "color": "#FFD600",
       "permission": {
