@@ -1,6 +1,10 @@
 {
   "recent": [
     {
+      "providerID": "openrouter",
+      "modelID": "google/gemma-4-31b-it:free"
+    },
+    {
       "providerID": "kilo",
       "modelID": "anthropic/claude-opus-4.6-fast"
     },
@@ -31,10 +35,6 @@
     {
       "providerID": "opencode",
       "modelID": "big-pickle"
-    },
-    {
-      "providerID": "openrouter",
-      "modelID": "google/gemma-4-31b-it:free"
     },
     {
       "providerID": "openrouter",
