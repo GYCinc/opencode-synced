@@ -1,6 +1,10 @@
 {
   "recent": [
     {
+      "providerID": "kilo",
+      "modelID": "moonshotai/kimi-k2.6"
+    },
+    {
       "providerID": "openrouter",
       "modelID": "google/gemma-4-31b-it:free"
     },
@@ -35,10 +39,6 @@
     {
       "providerID": "opencode",
       "modelID": "big-pickle"
-    },
-    {
-      "providerID": "openrouter",
-      "modelID": "qwen/qwen3-coder"
     }
   ],
   "favorite": [],
