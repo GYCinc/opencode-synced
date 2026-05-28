@@ -1,0 +1,49 @@
+{
+  "agent": {
+    "openagent": {
+      "mode": "primary",
+      "model": "deepseek/deepseek-v4-pro",
+      "temperature": 0.2,
+      "steps": 25,
+      "color": "#00BFA5",
+      "permission": {
+        "bash": {
+          "*": "ask",
+          "rm -rf /*": "deny",
+          "sudo *": "deny"
+        },
+        "edit": {
+          "**/*.env*": "deny",
+          "**/*.key": "deny",
+          "**/.secrets*": "deny",
+          "**/railway.toml": "deny",
+          "**/railpack.json": "deny",
+          "**/*.db": "deny",
+          "node_modules/**": "deny",
+          ".git/**": "deny"
+        }
+      }
+    },
+    "opencoder": {
+      "mode": "subagent",
+      "model": "deepseek/deepseek-v4-pro",
+      "temperature": 0.3,
+      "steps": 20,
+      "hidden": true,
+      "color": "#2979FF",
+      "permission": {
+        "bash": {
+          "*": "ask",
+          "rm -rf /*": "deny",
+          "sudo *": "deny"
+        },
+        "edit": {
+          "**/*.env*": "deny",
+          "**/.secrets*": "deny",
+          "node_modules/**": "deny",
+          ".git/**": "deny"
+        }
+      }
+    }
+  }
+}

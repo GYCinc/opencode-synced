@@ -1,0 +1,43 @@
+{
+  "$schema": "https://ocx.kdco.dev/schemas/profile.json",
+  "registries": {},
+  "renameWindow": true,
+
+  "include": [
+    "**/*.ts",
+    "**/*.js",
+    "**/*.svelte",
+    "**/*.css",
+    "**/*.html",
+    "**/*.json",
+    "**/*.md",
+    "**/*.toml",
+    "**/*.yaml",
+    "**/*.yml",
+    "**/Dockerfile",
+    "**/Procfile",
+    "**/.mcp.json",
+    "**/package.json",
+    "**/tsconfig.json"
+  ],
+
+  "exclude": [
+    "**/.env",
+    "**/.env.*",
+    "**/railway.toml",
+    "**/railpack.json",
+    "**/*.db",
+    "**/*.sqlite",
+    "**/pnpm-lock.yaml",
+    "**/bun.lock",
+    "**/package-lock.json",
+    "**/.git/**",
+    "**/node_modules/**",
+    "**/.ssh/**",
+    "**/.gnupg/**",
+    ".config/opencode/profiles/students/**",
+    ".config/opencode/profiles/ws/**",
+    ".config/opencode/profiles/default/**",
+    ".opencode/**"
+  ]
+}
