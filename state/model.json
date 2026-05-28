@@ -1,6 +1,10 @@
 {
   "recent": [
     {
+      "providerID": "kilo",
+      "modelID": "ai21/jamba-large-1.7"
+    },
+    {
       "providerID": "deepseek",
       "modelID": "deepseek-v4-pro"
     },

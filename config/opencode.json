@@ -1,6 +1,13 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "plugin": [
-    "open-plan-annotator@latest"
+    "open-plan-annotator@latest",
+    "opencode-synced",
+    "opencode-pty",
+    "opencode-skills",
+    "opencode-chrome-devtools",
+    "@sveltejs/opencode",
+    "opencode-handoff",
+    "@spoons-and-mirrors/pocket-universe@latest"
   ]
 }

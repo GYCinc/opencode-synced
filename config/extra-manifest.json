@@ -1,0 +1,288 @@
+{
+  "entries": [
+    {
+      "sourcePath": "/home/hayron/.config/opencode/profiles",
+      "repoPath": "config/extra/home_hayron_.config_opencode_profiles-d0bf57b6",
+      "type": "dir",
+      "mode": 448,
+      "items": [
+        {
+          "relativePath": "students",
+          "type": "dir",
+          "mode": 448
+        },
+        {
+          "relativePath": "students/opencode.jsonc",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "students/AGENTS.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "students/agents",
+          "type": "dir",
+          "mode": 493
+        },
+        {
+          "relativePath": "students/agents/airon-context-management.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "students/agents/airon-et.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "students/agents/airon-feedback-loop.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "students/agents/airon-report-generation.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "students/agents/airon-sanitization.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "students/agents/airon-task-design.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "students/ocx.jsonc",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish",
+          "type": "dir",
+          "mode": 448
+        },
+        {
+          "relativePath": "gitenglish/opencode.jsonc",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/AGENTS.md",
+          "type": "file",
+          "mode": 292
+        },
+        {
+          "relativePath": "gitenglish/agents",
+          "type": "dir",
+          "mode": 493
+        },
+        {
+          "relativePath": "gitenglish/agents/openagent.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/agents/opencoder.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/agents/subagents",
+          "type": "dir",
+          "mode": 493
+        },
+        {
+          "relativePath": "gitenglish/agents/subagents/code",
+          "type": "dir",
+          "mode": 493
+        },
+        {
+          "relativePath": "gitenglish/agents/subagents/code/coder-agent.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/agents/subagents/code/reviewer.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/agents/subagents/code/test-engineer.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/agents/subagents/code/build-agent.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/agents/subagents/core",
+          "type": "dir",
+          "mode": 493
+        },
+        {
+          "relativePath": "gitenglish/agents/subagents/core/task-manager.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/agents/subagents/core/documentation.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/agents/subagents/core/contextscout.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/agents/subagents/core/externalscout.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/agents/subagents/development",
+          "type": "dir",
+          "mode": 493
+        },
+        {
+          "relativePath": "gitenglish/agents/subagents/development/frontend-specialist.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/agents/subagents/development/devops-specialist.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/agents/subagents/system-builder",
+          "type": "dir",
+          "mode": 493
+        },
+        {
+          "relativePath": "gitenglish/agents/subagents/system-builder/context-organizer.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/commands",
+          "type": "dir",
+          "mode": 493
+        },
+        {
+          "relativePath": "gitenglish/commands/add-context.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/commands/analyze-patterns.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/commands/clean.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/commands/commit.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/commands/context.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/commands/optimize.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/commands/test.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/commands/validate-repo.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/skills",
+          "type": "dir",
+          "mode": 493
+        },
+        {
+          "relativePath": "gitenglish/skills/context7",
+          "type": "dir",
+          "mode": 493
+        },
+        {
+          "relativePath": "gitenglish/skills/context7/SKILL.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/skills/context7/README.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/skills/context7/library-registry.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/skills/context7/navigation.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/skills/task-management",
+          "type": "dir",
+          "mode": 493
+        },
+        {
+          "relativePath": "gitenglish/skills/task-management/SKILL.md",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/skills/task-management/router.sh",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/skills/task-management/scripts",
+          "type": "dir",
+          "mode": 493
+        },
+        {
+          "relativePath": "gitenglish/skills/task-management/scripts/task-cli.ts",
+          "type": "file",
+          "mode": 420
+        },
+        {
+          "relativePath": "gitenglish/ocx.jsonc",
+          "type": "file",
+          "mode": 420
+        }
+      ]
+    },
+    {
+      "sourcePath": "/home/hayron/opencode.jsonc",
+      "repoPath": "config/extra/home_hayron_opencode.jsonc-69e02cc7",
+      "type": "file",
+      "mode": 420
+    }
+  ]
+}
