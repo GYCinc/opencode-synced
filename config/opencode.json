@@ -8,6 +8,7 @@
     "opencode-chrome-devtools",
     "@sveltejs/opencode",
     "opencode-handoff",
+    "opencode-ralph-loop",
     "@spoons-and-mirrors/pocket-universe@latest"
   ]
 }
