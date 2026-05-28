@@ -1,6 +1,10 @@
 {
   "recent": [
     {
+      "providerID": "kilo",
+      "modelID": "anthropic/claude-opus-4.6-fast"
+    },
+    {
       "providerID": "openrouter",
       "modelID": "qwen/qwen3-next-80b-a3b-instruct:free"
     },
@@ -45,6 +49,7 @@
     "opencode/qwen3.6-plus-free": "default",
     "deepseek/deepseek-v4-flash": "max",
     "mistral/pixtral-large-latest": "default",
-    "opencode/deepseek-v4-flash-free": "max"
+    "opencode/deepseek-v4-flash-free": "max",
+    "kilo/anthropic/claude-opus-4.6-fast": "medium"
   }
 }
