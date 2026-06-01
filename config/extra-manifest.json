@@ -32,16 +32,6 @@
           "mode": 493
         },
         {
-          "relativePath": "students/skills/student-session-report",
-          "type": "dir",
-          "mode": 493
-        },
-        {
-          "relativePath": "students/skills/student-session-report/SKILL.md",
-          "type": "file",
-          "mode": 420
-        },
-        {
           "relativePath": "gitenglish",
           "type": "dir",
           "mode": 448
@@ -107,67 +97,11 @@
           "mode": 493
         },
         {
-          "relativePath": "gitenglish/skills/context7",
-          "type": "dir",
-          "mode": 493
-        },
-        {
-          "relativePath": "gitenglish/skills/context7/SKILL.md",
-          "type": "file",
-          "mode": 420
-        },
-        {
-          "relativePath": "gitenglish/skills/context7/README.md",
-          "type": "file",
-          "mode": 420
-        },
-        {
-          "relativePath": "gitenglish/skills/context7/library-registry.md",
-          "type": "file",
-          "mode": 420
-        },
-        {
-          "relativePath": "gitenglish/skills/context7/navigation.md",
-          "type": "file",
-          "mode": 420
-        },
-        {
-          "relativePath": "gitenglish/skills/task-management",
-          "type": "dir",
-          "mode": 493
-        },
-        {
-          "relativePath": "gitenglish/skills/task-management/SKILL.md",
-          "type": "file",
-          "mode": 420
-        },
-        {
-          "relativePath": "gitenglish/skills/task-management/router.sh",
-          "type": "file",
-          "mode": 420
-        },
-        {
-          "relativePath": "gitenglish/skills/task-management/scripts",
-          "type": "dir",
-          "mode": 493
-        },
-        {
-          "relativePath": "gitenglish/skills/task-management/scripts/task-cli.ts",
-          "type": "file",
-          "mode": 420
-        },
-        {
           "relativePath": "gitenglish/ocx.jsonc",
           "type": "file",
           "mode": 420
         }
       ]
-    },
-    {
-      "sourcePath": "/home/hayron/opencode.jsonc",
-      "repoPath": "config/extra/home_hayron_opencode.jsonc-69e02cc7",
-      "type": "file",
-      "mode": 420
     }
   ]
 }

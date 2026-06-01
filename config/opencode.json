@@ -1,14 +1,57 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "railway": {
+      "command": [
+        "railway",
+        "mcp"
+      ],
+      "enabled": true,
+      "type": "local"
+    },
+    "svelte": {
+      "type": "remote",
+      "url": "https://mcp.svelte.dev/mcp"
+    }
+  },
   "plugin": [
     "open-plan-annotator@latest",
-    "opencode-synced",
+    [
+      "@vectorize-io/opencode-hindsight",
+      {
+        "hindsightApiUrl": "http://localhost:8888",
+        "bankId": "main",
+        "autoRecall": true,
+        "autoRetain": true,
+        "recallBudget": "mid",
+        "retainEveryNTurns": 3,
+        "retainMode": "full-session",
+        "recallMaxTokens": 2048,
+        "recallTags": [
+          "type:session-summary",
+          "project:gitenglish"
+        ],
+        "recallTagsMatch": "any",
+        "debug": false
+      }
+    ],
     "opencode-pty",
     "opencode-skills",
     "opencode-chrome-devtools",
     "@sveltejs/opencode",
     "opencode-handoff",
     "opencode-ralph-loop",
-    "@spoons-and-mirrors/pocket-universe@latest"
-  ]
+    "@spoons-and-mirrors/pocket-universe@latest",
+    "@daytona/opencode",
+    "opencode-websearch-cited@1.2.0",
+    "@zenobius/opencode-skillful",
+    "opencode-goal-plugin"
+  ],
+  "command": {
+    "goal": {
+      "description": "Set a session-scoped goal and auto-continue until complete.",
+      "template": "$ARGUMENTS",
+      "agent": "build"
+    }
+  }
 }

@@ -3,7 +3,11 @@
   "mcp": {
     "lazy-mcp": {
       "type": "local",
-      "command": ["lazy-mcp", "--config", "/home/hayron/.config/lazy-mcp/servers.json"],
+      "command": [
+        "lazy-mcp",
+        "--config",
+        "/home/hayron/.config/lazy-mcp/servers.json"
+      ],
       "enabled": true
     }
   },
@@ -16,8 +20,14 @@
       "steps": 40,
       "color": "#00E5FF",
       "permission": {
-        "skill": { "*": "deny", "airon-*": "allow" },
-        "task": { "*": "deny", "airon-*": "allow" }
+        "skill": {
+          "*": "deny",
+          "airon-*": "allow"
+        },
+        "task": {
+          "*": "deny",
+          "airon-*": "allow"
+        }
       }
     },
     "airon-context-management": {
@@ -30,8 +40,14 @@
       "color": "#7C4DFF",
       "permission": {
         "bash": "deny",
-        "edit": { "*": "deny", "*/student_context.toml": "allow" },
-        "skill": { "*": "deny", "airon-context-management": "allow" }
+        "edit": {
+          "*": "deny",
+          "*/student_context.toml": "allow"
+        },
+        "skill": {
+          "*": "deny",
+          "airon-context-management": "allow"
+        }
       }
     },
     "airon-task-design": {
@@ -45,7 +61,10 @@
       "permission": {
         "bash": "deny",
         "edit": "deny",
-        "skill": { "*": "deny", "airon-task-design": "allow" }
+        "skill": {
+          "*": "deny",
+          "airon-task-design": "allow"
+        }
       }
     },
     "airon-report-generation": {
@@ -57,8 +76,15 @@
       "color": "#00E676",
       "permission": {
         "bash": "deny",
-        "edit": { "*": "deny", "*.html": "allow", "*.md": "allow" },
-        "skill": { "*": "deny", "airon-report-generation": "allow" }
+        "edit": {
+          "*": "deny",
+          "*.html": "allow",
+          "*.md": "allow"
+        },
+        "skill": {
+          "*": "deny",
+          "airon-report-generation": "allow"
+        }
       }
     },
     "airon-sanitization": {
@@ -70,9 +96,18 @@
       "hidden": true,
       "color": "#FF4081",
       "permission": {
-        "bash": { "*": "ask", "rm *": "allow", "rm -rf *": "allow", "ls *": "allow", "find *": "allow" },
+        "bash": {
+          "*": "ask",
+          "rm *": "allow",
+          "rm -rf *": "allow",
+          "ls *": "allow",
+          "find *": "allow"
+        },
         "edit": "deny",
-        "skill": { "*": "deny", "airon-sanitization": "allow" }
+        "skill": {
+          "*": "deny",
+          "airon-sanitization": "allow"
+        }
       }
     },
     "airon-feedback-loop": {
@@ -85,8 +120,31 @@
       "color": "#FFD600",
       "permission": {
         "bash": "deny",
-        "edit": { "*": "deny", "By Student/*/RULES.md": "allow" },
-        "skill": { "*": "deny", "airon-feedback-loop": "allow" }
+        "edit": {
+          "*": "deny",
+          "By Student/*/RULES.md": "allow"
+        },
+        "skill": {
+          "*": "deny",
+          "airon-feedback-loop": "allow"
+        }
+      }
+    },
+    "airon-judge": {
+      "mode": "subagent",
+      "model": "deepseek/deepseek-v4-pro",
+      "temperature": 0.3,
+      "reasoningEffort": "high",
+      "steps": 25,
+      "hidden": true,
+      "color": "#F50057",
+      "permission": {
+        "bash": "deny",
+        "edit": "deny",
+        "skill": {
+          "*": "deny",
+          "airon-judge": "allow"
+        }
       }
     }
   }
